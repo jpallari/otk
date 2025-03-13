@@ -1,6 +1,10 @@
-# 🛠️  Operations Toolkit (OTK)
+# 🛠️  Orchestration Toolkit (OTK)
 
-Collections of tools for operations.
+Collections of tools for software orchestration.
+
+## Tools
+
+- [gitsync](README.gitsync.md)
 
 ## License
 

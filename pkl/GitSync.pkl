@@ -1,0 +1,51 @@
+class ConfigSingle {
+  path: String
+  targets: Listing<Target>
+}
+
+class Target extends Repository {
+  interval: String
+  branches: Listing<String>
+  tags: Listing<String>
+}
+
+class Config {
+  repositories: Mapping<String, Repository>
+  mappings: Listing<SyncMapping>
+}
+
+open class Credentials {
+  httpToken: String? = null
+  httpCredentials: HttpCredentials?
+  sshCredentials: SshCredentials?
+}
+
+class HttpCredentials {
+  username: String? = null
+  password: String? = null
+}
+
+class SshCredentials {
+  useAgent: Boolean? = null
+  username: String? = null
+  keyPath: String? = null
+  keyPassword: String? = null
+  hostKey: String? = null
+  knownHostsPaths: Listing<String>? = null
+  ignoreHostKey: Boolean? = null
+}
+
+open class Repository extends Credentials {
+  authMethod: String? = null
+  url: String
+  inMemory: Boolean? = null
+  localPath: String? = null
+}
+
+class SyncMapping {
+  source: String
+  targets: Listing<String>
+  interval: String
+  branches: Listing<String>
+  tags: Listing<String>
+}

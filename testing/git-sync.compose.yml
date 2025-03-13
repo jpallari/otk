@@ -1,0 +1,10 @@
+services:
+  git-server-ssh:
+    build: ./git-server-ssh
+    ports:
+      - "2222:22"
+    environment:
+      GIT_REPOS: test-s1 test-s2 test-s3 test-t1 test-t2 test-t3 test-t4
+      SSH_AUTHORIZED_KEYS_FILE: /authorized-keys
+    volumes:
+      - ./test-data/ssh-key.ed25519.pub:/authorized-keys:ro,z

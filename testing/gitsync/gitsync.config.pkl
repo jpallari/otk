@@ -1,0 +1,70 @@
+import "../../pkl/gitsync.pkl"
+
+urlBase = "ssh://${GITSYNC_SSH_HOST}:${GITSYNC_SSH_PORT}/srv/git/"
+
+repoTemplate: gitsync.Repository = new {
+  sshCredentials = new {
+    ignoreHostKey = true
+    keyPath = "./ssh-key"
+    keyPassword = "${GITSYNC_SSH_KEY_PASSWORD}"
+  }
+}
+
+config: gitsync.Config = new {
+  repositories = new {
+    ["test-s1"] = (repoTemplate) {
+      inMemory = true
+      url = urlBase + "test-s1.git"
+    }
+    ["test-s2"] = (repoTemplate) {
+      url = urlBase + "test-s2.git"
+    }
+    ["test-s3"] = (repoTemplate) {
+      localPath = "/tmp/git-sync-test-s3"
+      url = urlBase + "test-s3.git"
+    }
+    ["test-t1"] = (repoTemplate) {
+      url = urlBase + "test-t1.git"
+    }
+    ["test-t2"] = (repoTemplate) {
+      url = urlBase + "test-t2.git"
+    }
+    ["test-t3"] = (repoTemplate) {
+      url = urlBase + "test-t3.git"
+    }
+    ["test-t4"] = (repoTemplate) {
+      url = urlBase + "test-t4.git"
+    }
+  }
+  mappings = new Listing {
+    new gitsync.SyncMapping {
+      source = "test-s1"
+      targets = new Listing { "test-t1" }
+      interval = "10s"
+      branches = new {
+        "main"
+        "/v.*/"
+      }
+    }
+    new gitsync.SyncMapping {
+      source = "test-s2"
+      targets = new Listing { "test-t2" "test-t3" }
+      interval = "15s"
+      branches = new {
+        "/main.*/"
+      }
+    }
+    new gitsync.SyncMapping {
+      source = "test-s3"
+      targets = new Listing { "test-t4" }
+      interval = "18s"
+      branches = new {
+        "main"
+      }
+    }
+  }
+}
+
+output {
+  value = config
+}
