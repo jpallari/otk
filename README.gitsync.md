@@ -4,7 +4,20 @@ Synchronise Git repositories.
 
 ## Installation
 
-First, you need to install [Go](https://golang.org/dl/) version 1.24 or higher.
+First, you need to install [Go compiler](https://golang.org/dl/) version 1.24 or higher.
+Make sure `~/go/bin` or `$GOPATH/bin` is in your `PATH` variable.
+
+After that, you can install gitsync with the Go tools:
+
+```shell
+go install go.lepovirta.org/otk/cmd/otk-gitsync
+```
+
+You can then execute gitsync with `otk-gitsync`. Example:
+
+```shell
+otk-gitsync -h
+```
 
 ## Usage
 
