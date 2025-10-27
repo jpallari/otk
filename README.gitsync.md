@@ -122,8 +122,8 @@ The values in the configuration below are default values.
 
             // How frequently to synchronise the Git repository.
             // Specified as a sequence of decimal numbers, each with optional fraction
-            // and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
-            // Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+            // and a unit suffix, such as "300ms", "1.5h" or "2h45m".
+            // Valid time units are "ns", "us", "ms", "s", "m", "h".
             "interval": "1h",
 
             // List of branches to synchronise to the target Git repository.
@@ -223,12 +223,12 @@ The values in the configuration below are default values.
             "source": "",
 
             // The IDs of the repositories to sync the source repository to.
-            "targets": []
+            "targets": [],
 
             // How frequently to synchronise the Git repository.
             // Specified as a sequence of decimal numbers, each with optional fraction
-            // and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
-            // Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+            // and a unit suffix, such as "300ms", "1.5h" or "2h45m".
+            // Valid time units are "ns", "us", "ms", "s", "m", "h".
             "interval": "1h",
 
             // List of branches to synchronise to the target Git repository.
