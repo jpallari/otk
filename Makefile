@@ -1,25 +1,25 @@
 .PHONY: build/otk-gitsync
 build/otk-gitsync:
-	go build -o $@ ./cmd/otk-gitsync
+	mise exec -- go build -o $@ ./cmd/otk-gitsync
 
 .PHONY: go-mod-download
 go-mod-download:
-	go mod download
-	cd testing && go mod download
+	mise exec -- go mod download
+	cd testing && mise exec -- go mod download
 
 .PHONY: go-mod-tidy
 go-mod-tidy:
-	go mod tidy
-	cd testing && go mod tidy
+	mise exec -- go mod tidy
+	cd testing && mise exec -- go mod tidy
 
 .PHONY: go-update-deps
 go-update-deps:
-	go get -u ./...
-	cd testing && go get -u ./...
+	mise exec -- go get -u ./...
+	cd testing && mise exec -- go get -u ./...
 
 .PHONY: test
 test:
-	go test -race ./...
+	mise exec -- go test -race ./...
 
 .PHONY: testing-init-podman
 testing-init-podman:
@@ -30,4 +30,4 @@ test-integration-podman:
 	cd testing && \
 	DOCKER_HOST="unix://$$(podman info --format '{{.Host.RemoteSocket.Path}}')" \
 	TESTCONTAINERS_RYUK_DISABLED=true \
-	go test -race -v ./...
+	mise exec -- go test -race -v ./...
