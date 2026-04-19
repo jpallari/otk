@@ -406,13 +406,13 @@ func (this *GitSync) getRemoteBranchesAndTags(
 
 	for _, ref := range refs {
 		refName := ref.Name().String()
-		if strings.HasPrefix(refName, refPrefixBranch) {
-			branch := strings.TrimPrefix(refName, refPrefixBranch)
+		if after, ok := strings.CutPrefix(refName, refPrefixBranch); ok {
+			branch := after
 			if matchAny(this.mapping.Branches, branch) {
 				branches = append(branches, branch)
 			}
-		} else if strings.HasPrefix(refName, refPrefixTag) {
-			tag := strings.TrimPrefix(refName, refPrefixTag)
+		} else if after, ok := strings.CutPrefix(refName, refPrefixTag); ok {
+			tag := after
 			if matchAny(this.mapping.Tags, tag) {
 				tags = append(tags, tag)
 			}

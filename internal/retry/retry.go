@@ -55,10 +55,7 @@ func (this DelayFunc) WithJitter(
 	return func(attemptNr int) time.Duration {
 		delay := this(attemptNr)
 
-		jitterBase := delay / 2
-		if jitterBase > maxJitter {
-			jitterBase = maxJitter
-		}
+		jitterBase := min(delay/2, maxJitter)
 
 		r := rand.Float64()
 		jitter := time.Duration(float64(jitterBase) * r)
