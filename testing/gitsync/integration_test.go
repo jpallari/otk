@@ -205,7 +205,7 @@ func TestIntegration(t *testing.T) {
 		testcontainers.CleanupContainer(t, container)
 		require.NoError(err, "git-server start")
 		sshHost, err = container.Host(ctx)
-		require.NoError(err)
+		require.NoError(err, "git-server host")
 		sshContainerPort, err := container.MappedPort(ctx, "22/tcp")
 		require.NoError(err, "git-server port")
 		sshPort = sshContainerPort.Int()
@@ -253,7 +253,7 @@ type commit struct {
 }
 
 func setupTestRepository(
-	ctx context.Context,
+	_ context.Context,
 	worktree billy.Filesystem,
 	repoName string,
 	sshHost string,

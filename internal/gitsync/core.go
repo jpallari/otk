@@ -80,7 +80,7 @@ func (this *Core) runOnce(ctx context.Context) error {
 	errs := make([]error, 0, len(this.cfg.Mappings))
 	var gitSync GitSync
 	for _, mapping := range this.cfg.Mappings {
-		if err := gitSync.Init(ctx, this.osEnv.Fs, this.cfg.Repositories, &mapping); err != nil {
+		if err := gitSync.Init(ctx, &this.osEnv, this.cfg.Repositories, &mapping); err != nil {
 			cleanUp(&gitSync)
 			errs = append(errs, err)
 			continue
@@ -108,7 +108,7 @@ func (this *Core) runLoop(ctx context.Context) error {
 	gitSyncs := make([]GitSync, len(this.cfg.Mappings))
 	for i, mapping := range this.cfg.Mappings {
 		gitSync := &gitSyncs[i]
-		if err := gitSync.Init(ctx, this.osEnv.Fs, this.cfg.Repositories, &mapping); err != nil {
+		if err := gitSync.Init(ctx, &this.osEnv, this.cfg.Repositories, &mapping); err != nil {
 			cleanUp(gitSync)
 			return err
 		}

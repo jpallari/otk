@@ -2,6 +2,7 @@ package osenv
 
 import (
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/go-git/go-billy/v5"
@@ -10,12 +11,13 @@ import (
 )
 
 type OsEnv struct {
-	Args    []string
-	Fs      billy.Filesystem
-	EnvVars envvar.Vars
-	Stdin   io.Reader
-	Stdout  io.Writer
-	Stderr  io.Writer
+	Args          []string
+	Fs            billy.Filesystem
+	EnvVars       envvar.Vars
+	Stdin         io.Reader
+	Stdout        io.Writer
+	Stderr        io.Writer
+	HttpTransport http.RoundTripper
 }
 
 func (this *OsEnv) FromRealEnv() {
@@ -25,4 +27,5 @@ func (this *OsEnv) FromRealEnv() {
 	this.Stdin = os.Stdin
 	this.Stdout = os.Stdout
 	this.Stderr = os.Stderr
+	this.HttpTransport = http.DefaultTransport
 }

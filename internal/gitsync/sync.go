@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -17,12 +18,15 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/cache"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/client"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"go.lepovirta.org/otk/internal/gitsync/config"
 	"go.lepovirta.org/otk/internal/logging"
 	"go.lepovirta.org/otk/internal/matcher"
+	"go.lepovirta.org/otk/internal/osenv"
 )
 
 const (
@@ -64,11 +68,11 @@ func (this *GitSync) getLogger(ctx context.Context) *slog.Logger {
 
 func (this *GitSync) Init(
 	ctx context.Context,
-	fs billy.Filesystem,
+	osEnv *osenv.OsEnv,
 	repoConfigs map[string]config.Repository,
 	mapping *config.SyncMapping,
 ) (err error) {
-	err = this.init(ctx, fs, repoConfigs, mapping)
+	err = this.init(ctx, osEnv, repoConfigs, mapping)
 	if err != nil {
 		log := this.getLogger(ctx)
 		log.ErrorContext(ctx, "init failed", slog.Any("error", err))
@@ -78,13 +82,20 @@ func (this *GitSync) Init(
 
 func (this *GitSync) init(
 	ctx context.Context,
-	fs billy.Filesystem,
+	osEnv *osenv.OsEnv,
 	repoConfigs map[string]config.Repository,
 	mapping *config.SyncMapping,
 ) (err error) {
 	var ok bool
 	this.repoConfigs = repoConfigs
 	this.mapping = mapping
+
+	// Use custom HTTP client
+	httpClient := http.Client{
+		Transport: osEnv.HttpTransport,
+		Timeout:   2 * time.Minute,
+	}
+	client.InstallProtocol("https", githttp.NewClient(&httpClient))
 
 	// Source
 	sourceRepoConfig, ok := this.repoConfigs[this.mapping.Source]
@@ -99,7 +110,7 @@ func (this *GitSync) init(
 
 	// Source authentication
 	var sourceAuth transport.AuthMethod
-	sourceAuth, err = configToAuth(fs, this.sourceRepoConfig, log)
+	sourceAuth, err = configToAuth(osEnv.Fs, this.sourceRepoConfig, log)
 	if err != nil {
 		err = this.sourceRepoError("failed to configure auth", err)
 		return
@@ -125,7 +136,7 @@ func (this *GitSync) init(
 		path = this.sourceRepoConfig.LocalPath
 		if path == "" {
 			log.DebugContext(ctx, "Preparing temp directory", slog.String("url", this.sourceRepoConfig.URL))
-			path, err = fsutil.TempDir(fs, "", fmt.Sprintf("%s-%s", config.AppName, this.mapping.Source))
+			path, err = fsutil.TempDir(osEnv.Fs, "", fmt.Sprintf("%s-%s", config.AppName, this.mapping.Source))
 			if err != nil {
 				err = this.sourceRepoError("failed to create temporary directory", err)
 				return
@@ -134,7 +145,7 @@ func (this *GitSync) init(
 		}
 
 		var pathFs billy.Filesystem
-		pathFs, err = fs.Chroot(path)
+		pathFs, err = osEnv.Fs.Chroot(path)
 		if err != nil {
 			err = this.sourceRepoError(fmt.Sprintf("failed to chroot path '%s'", path), err)
 			return
@@ -183,7 +194,7 @@ func (this *GitSync) init(
 		)
 
 		var authMethod transport.AuthMethod
-		authMethod, err = configToAuth(fs, &targetRepoConfig, log)
+		authMethod, err = configToAuth(osEnv.Fs, &targetRepoConfig, log)
 		if err != nil {
 			err = &GitRepoError{
 				RepoId:  targetId,
