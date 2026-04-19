@@ -5,9 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"syscall"
 
-	"github.com/rs/zerolog"
 	"go.lepovirta.org/otk/internal/gitsync/config"
 	"go.lepovirta.org/otk/internal/logging"
 	"go.lepovirta.org/otk/internal/osenv"
@@ -46,18 +46,18 @@ func (this *Core) Init(osEnv osenv.OsEnv) error {
 }
 
 func (this *Core) Run(ctx context.Context) error {
-	log := zerolog.Ctx(ctx)
+	log := logging.FromContext(ctx)
 
 	if !this.cliFlags.Run {
-		log.Debug().Msg("run dry-run")
+		log.DebugContext(ctx, "run dry-run")
 		return this.dryRun()
 	}
 
 	if this.cliFlags.Once {
-		log.Debug().Msg("run once")
+		log.DebugContext(ctx, "run once")
 		return this.runOnce(ctx)
 	}
-	log.Debug().Msg("run in a loop")
+	log.DebugContext(ctx, "run in a loop")
 	return this.runLoop(ctx)
 }
 
@@ -69,11 +69,11 @@ func (this *Core) runOnce(ctx context.Context) error {
 	ctx, sigCancel := sighandle.CancelOnSignals(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer sigCancel()
 
-	log := zerolog.Ctx(ctx)
+	log := logging.FromContext(ctx)
 
 	cleanUp := func(gitSync *GitSync) {
 		if err := gitSync.Clean(this.osEnv.Fs); err != nil {
-			log.Err(err).Msg("cleanup failed")
+			log.ErrorContext(ctx, "cleanup failed", slog.Any("error", err))
 		}
 	}
 
@@ -97,11 +97,11 @@ func (this *Core) runLoop(ctx context.Context) error {
 	ctx, sigCancel := sighandle.CancelOnSignals(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer sigCancel()
 
-	log := zerolog.Ctx(ctx)
+	log := logging.FromContext(ctx)
 
 	cleanUp := func(gitSync *GitSync) {
 		if err := gitSync.Clean(this.osEnv.Fs); err != nil {
-			log.Err(err).Msg("cleanup failed")
+			log.ErrorContext(ctx, "cleanup failed", slog.Any("error", err))
 		}
 	}
 

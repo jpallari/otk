@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"log/slog"
 	"os"
 
 	"go.lepovirta.org/otk/internal/gitsync"
 	"go.lepovirta.org/otk/internal/osenv"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -28,6 +28,6 @@ func handleError(err error) {
 	if err == flag.ErrHelp {
 		os.Exit(1)
 	}
-	log.Error().Err(err).Msg("fatal error")
+	slog.Error("fatal error", slog.Any("error", err))
 	os.Exit(1)
 }

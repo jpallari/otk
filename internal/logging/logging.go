@@ -1,43 +1,64 @@
 package logging
 
 import (
+	"context"
+	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"go.lepovirta.org/otk/internal/envvar"
-	"github.com/rs/zerolog"
 )
 
 type Config struct {
 	Format     string     `json:"format"`
 	Level      string     `json:"level"`
 	FieldNames FieldNames `json:"fieldNames"`
-	TimeFormat string     `json:"timeFormat"`
+	AddSource  bool       `json:"addSource"`
 }
 
 type FieldNames struct {
 	Timestamp string `json:"timestamp"`
 	Message   string `json:"message"`
 	Level     string `json:"level"`
+	Source    string `json:"source"`
 }
+
+type loggerCtxKey struct{}
 
 func (this *Config) FromEnv(appName string, envVars envvar.Vars) {
 	this.Level = envVars.GetForApp(appName, "LOG_LEVEL")
 	this.Format = envVars.GetForApp(appName, "LOG_FORMAT")
-	this.TimeFormat = envVars.GetForApp(appName, "LOG_TIME_FORMAT")
 	this.FieldNames.FromEnv(appName, envVars)
 }
 
 func (this *FieldNames) FromEnv(appName string, envVars envvar.Vars) {
 	this.Timestamp = envVars.GetForAppOr(
-		appName, "LOG_FIELD_TIMESTAMP", zerolog.TimestampFieldName,
+		appName, "LOG_FIELD_TIMESTAMP", slog.TimeKey,
 	)
 	this.Message = envVars.GetForAppOr(
-		appName, "LOG_FIELD_MESSAGE", zerolog.MessageFieldName,
+		appName, "LOG_FIELD_MESSAGE", slog.MessageKey,
 	)
 	this.Level = envVars.GetForAppOr(
-		appName, "LOG_FIELD_LEVEL", zerolog.LevelFieldName,
+		appName, "LOG_FIELD_LEVEL", slog.LevelKey,
 	)
+	this.Source = envVars.GetForAppOr(
+		appName, "LOG_FIELD_SOURCE", slog.SourceKey,
+	)
+}
+
+func (this *FieldNames) mapLogKey(key string) string {
+	switch key {
+	case slog.TimeKey:
+		return this.Timestamp
+	case slog.MessageKey:
+		return this.Message
+	case slog.LevelKey:
+		return this.Level
+	case slog.SourceKey:
+		return this.Source
+	}
+	return key
 }
 
 func (this *Config) SetupGlobal(
@@ -46,64 +67,71 @@ func (this *Config) SetupGlobal(
 ) {
 	var err error
 
-	// Logging fields
-	zerolog.TimeFieldFormat = this.TimeFormat
-	zerolog.TimestampFieldName = this.FieldNames.Timestamp
-	zerolog.MessageFieldName = this.FieldNames.Message
-	zerolog.LevelFieldName = this.FieldNames.Level
-
-	logger := zerolog.New(outStream).
-		With().
-		Timestamp().
-		Str("app", appName).
-		Logger()
-
-	// Logging level
-	var level zerolog.Level
-	if this.Level == "" {
-		level = zerolog.InfoLevel
-	} else {
-		level, err = zerolog.ParseLevel(this.Level)
-		if err != nil {
-			level = zerolog.InfoLevel
-		}
-	}
-	logger = logger.Level(level)
-	zerolog.SetGlobalLevel(level)
-
-	// Log format
-	output := logFormatToOutput(this.Format, outStream)
-	if output != nil {
-		logger = logger.Output(output)
+	var level slog.Level
+	switch strings.ToLower(this.Level) {
+	case "debug":
+		level = slog.LevelDebug
+	case "info", "":
+		level = slog.LevelInfo
+	case "warn", "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+		err = fmt.Errorf("unknown log level %s", this.Level)
 	}
 
-	zerolog.DefaultContextLogger = &logger
+	handlerOpts := slog.HandlerOptions{
+		AddSource: this.AddSource,
+		Level:     level,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if len(groups) == 0 {
+				a.Key = this.FieldNames.mapLogKey(a.Key)
+			}
+			return a
+		},
+	}
 
-	// Log warnings
+	handler := logFormatToOutput(this.Format, outStream, &handlerOpts)
+	logger := slog.New(
+		handler.WithAttrs([]slog.Attr{
+			slog.String("app", appName),
+		}),
+	)
+	slog.SetDefault(logger)
+
 	if err != nil {
-		logger.Warn().Msgf("unknown log level %s", this.Level)
+		logger.Warn("unknown log level", slog.String("level", this.Level))
 	}
-	if output == nil {
-		logger.Warn().Msgf("unknown log format: %s", this.Format)
+	if strings.ToLower(this.Format) != "json" && strings.ToLower(this.Format) != "pretty" && this.Format != "" {
+		logger.Warn("unknown log format", slog.String("format", this.Format))
 	}
-	logger.Debug().Msg("global logging setup done")
 }
 
-func baseLogger(appName string, outStream io.Writer) zerolog.Logger {
-	return zerolog.New(outStream).
-		With().
-		Timestamp().
-		Str("app", appName).
-		Logger()
+func AddToContext(ctx context.Context, logger *slog.Logger) context.Context {
+	return context.WithValue(ctx, loggerCtxKey{}, logger)
 }
 
-func logFormatToOutput(logFormat string, outStream io.Writer) io.Writer {
+func FromContext(ctx context.Context) *slog.Logger {
+	logger, ok := ctx.Value(loggerCtxKey{}).(*slog.Logger)
+	if ok {
+		return logger
+	}
+	return slog.Default()
+}
+
+func logFormatToOutput(
+	logFormat string,
+	outStream io.Writer,
+	opts *slog.HandlerOptions,
+) slog.Handler {
 	switch strings.ToLower(logFormat) {
 	case "json", "":
-		return outStream
+		return slog.NewJSONHandler(outStream, opts)
 	case "pretty":
-		return zerolog.ConsoleWriter{Out: outStream}
+		return slog.NewTextHandler(outStream, opts)
 	default:
-		return nil
+		return slog.NewJSONHandler(outStream, opts)
 	}
 }

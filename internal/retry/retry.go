@@ -3,16 +3,15 @@ package retry
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"math"
 	"math/rand/v2"
 	"time"
 
-	"github.com/rs/zerolog"
+	"go.lepovirta.org/otk/internal/logging"
 )
 
-var (
-	ErrCtxCancelled = errors.New("cancelled by context")
-)
+var ErrCtxCancelled = errors.New("cancelled by context")
 
 type DelayFunc func(int) time.Duration
 
@@ -75,7 +74,7 @@ func Retry(
 	delayFunc DelayFunc,
 	f Retryable,
 ) error {
-	log := zerolog.Ctx(ctx)
+	log := logging.FromContext(ctx)
 	var err error
 	timer := time.NewTimer(0)
 	var cancelErr *cancelError
@@ -95,11 +94,13 @@ func Retry(
 			}
 
 			delay := delayFunc(attempt)
-			log.Debug().
-				Err(err).
-				Str("nextAttemptIn", delay.String()).
-				Int("attempt", attempt).
-				Msg("retryable function failed")
+			log.DebugContext(
+				ctx,
+				"retryable function failed",
+				slog.Any("error", err),
+				slog.Duration("nextAttemptIn", delay),
+				slog.Int("attempt", attempt),
+			)
 			timer = time.NewTimer(delay)
 		}
 	}

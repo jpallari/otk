@@ -2,6 +2,7 @@ package gitsync
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/util"
@@ -9,7 +10,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"go.lepovirta.org/otk/internal/gitsync/config"
-	"github.com/rs/zerolog"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -18,19 +18,19 @@ const defaultGitUsername = "git"
 func configToAuth(
 	fs billy.Filesystem,
 	repoConfig *config.Repository,
-	log *zerolog.Logger,
+	log *slog.Logger,
 ) (transport.AuthMethod, error) {
 	switch repoConfig.AuthMethod() {
 	case config.AuthMethodNone:
-		log.Debug().Msg("no auth method selected")
+		log.Debug("no auth method selected")
 		return nil, nil
 	case config.AuthMethodHttpToken:
-		log.Debug().Msg("using http token for auth")
+		log.Debug("using http token for auth")
 		return &http.TokenAuth{
 			Token: repoConfig.HttpToken,
 		}, nil
 	case config.AuthMethodHttpCredentials:
-		log.Debug().Msg("using http basic for auth")
+		log.Debug("using http basic for auth")
 		return &http.BasicAuth{
 			Username: repoConfig.HttpCredentials.Username,
 			Password: repoConfig.HttpCredentials.Password,
@@ -40,7 +40,7 @@ func configToAuth(
 		if username == "" {
 			username = defaultGitUsername
 		}
-		log.Debug().Msgf("using ssh agent auth with username '%s'", username)
+		log.Debug("using ssh agent auth", slog.String("username", username))
 		auth, err := gitssh.NewSSHAgentAuth(repoConfig.SshCredentials.Username)
 		if err != nil {
 			return nil, fmt.Errorf("failed to configure SSH agent auth: %w", err)
@@ -56,16 +56,16 @@ func configToAuth(
 func sshKeyAuth(
 	fs billy.Filesystem,
 	creds config.SshCredentials,
-	log *zerolog.Logger,
+	log *slog.Logger,
 ) (transport.AuthMethod, error) {
 	username := creds.Username
 	if username == "" {
 		username = defaultGitUsername
 	}
-	log.Debug().Msgf("using ssh key auth with username '%s'", username)
+	log.Debug("using ssh key auth", slog.String("username", username))
 
 	sshKeyBytes, err := util.ReadFile(fs, creds.KeyPath)
-	log.Debug().Msgf("ssh key read (bytes=%d)", len(sshKeyBytes))
+	log.Debug("ssh key read", slog.Int("bytes", len(sshKeyBytes)))
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read SSH key from path '%s': %w",
@@ -84,7 +84,7 @@ func sshKeyAuth(
 	}
 
 	if creds.IgnoreHostKey {
-		log.Warn().Msg("disabling SSH host key check")
+		log.Warn("disabling SSH host key check")
 		auth.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else if creds.HostKey != "" {
 		pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(creds.HostKey))

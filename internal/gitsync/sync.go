@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -20,8 +21,8 @@ import (
 	"github.com/go-git/go-git/v5/storage/filesystem"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"go.lepovirta.org/otk/internal/gitsync/config"
+	"go.lepovirta.org/otk/internal/logging"
 	"go.lepovirta.org/otk/internal/matcher"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -50,15 +51,15 @@ func (this *GitSync) sourceRepoError(reason string, cause error) *GitRepoError {
 	}
 }
 
-func (this *GitSync) getLogger(ctx context.Context) zerolog.Logger {
-	log := zerolog.Ctx(ctx).With()
-	if this.mapping.Source != "" {
-		log = log.Str("sourceId", this.mapping.Source)
-	}
+func (this *GitSync) getLogger(ctx context.Context) *slog.Logger {
+	logArgs := make([]any, 0, 2)
 	if this.sourceRepoConfig != nil && this.sourceRepoConfig.URL != "" {
-		log = log.Str("sourceUrl", this.sourceRepoConfig.URL)
+		logArgs = append(logArgs, slog.String("sourceUrl", this.sourceRepoConfig.URL))
 	}
-	return log.Logger()
+	if this.mapping != nil && this.mapping.Source != "" {
+		logArgs = append(logArgs, slog.String("sourceId", this.mapping.Source))
+	}
+	return logging.FromContext(ctx).With(logArgs...)
 }
 
 func (this *GitSync) Init(
@@ -70,7 +71,7 @@ func (this *GitSync) Init(
 	err = this.init(ctx, fs, repoConfigs, mapping)
 	if err != nil {
 		log := this.getLogger(ctx)
-		log.Error().Err(err).Msg("init failed")
+		log.ErrorContext(ctx, "init failed", slog.Any("error", err))
 	}
 	return
 }
@@ -98,7 +99,7 @@ func (this *GitSync) init(
 
 	// Source authentication
 	var sourceAuth transport.AuthMethod
-	sourceAuth, err = configToAuth(fs, this.sourceRepoConfig, &log)
+	sourceAuth, err = configToAuth(fs, this.sourceRepoConfig, log)
 	if err != nil {
 		err = this.sourceRepoError("failed to configure auth", err)
 		return
@@ -123,7 +124,7 @@ func (this *GitSync) init(
 	} else {
 		path = this.sourceRepoConfig.LocalPath
 		if path == "" {
-			log.Debug().Msgf("Preparing temp directory for '%s'", this.sourceRepoConfig.URL)
+			log.DebugContext(ctx, "Preparing temp directory", slog.String("url", this.sourceRepoConfig.URL))
 			path, err = fsutil.TempDir(fs, "", fmt.Sprintf("%s-%s", config.AppName, this.mapping.Source))
 			if err != nil {
 				err = this.sourceRepoError("failed to create temporary directory", err)
@@ -142,14 +143,14 @@ func (this *GitSync) init(
 	}
 
 	// Initialize repo
-	log.Debug().Str("gitPath", path).Msgf("initializing in path %s", path)
+	log.DebugContext(ctx, "initializing repo", slog.String("gitPath", path))
 	this.repo, err = git.Init(storer, nil)
 	if err != nil && err != git.ErrRepositoryAlreadyExists {
 		err = this.sourceRepoError("failed to initialize repo", err)
 		return
 	}
 	if err == git.ErrRepositoryAlreadyExists {
-		log.Debug().Msgf("opening repo at %s", path)
+		log.DebugContext(ctx, "opening repo", slog.String("path", path))
 		this.repo, err = git.Open(storer, nil)
 		if err != nil {
 			err = this.sourceRepoError(fmt.Sprintf("failed to open path %s", path), err)
@@ -159,12 +160,9 @@ func (this *GitSync) init(
 
 	// Prepare source remote
 	if this.sourceRepoConfig.URL == "" {
-		log.Info().Msgf(
-			"no remote specified for %s, fetch will be skipped",
-			this.mapping.Source,
-		)
+		log.InfoContext(ctx, "no remote specified, fetch will be skipped", slog.String("source", this.mapping.Source))
 	} else {
-		err = prepareRemote(this.repo, this.mapping.Source, this.sourceRepoConfig, &log)
+		err = prepareRemote(ctx, this.repo, this.mapping.Source, this.sourceRepoConfig, log)
 		if err != nil {
 			err = this.sourceRepoError("failed to prepare remote", err)
 			return
@@ -179,13 +177,13 @@ func (this *GitSync) init(
 			err = fmt.Errorf("no configuration found for repo '%s'", targetId)
 			return
 		}
-		log := log.With().
-			Str("targetId", targetId).
-			Str("targetUrl", targetRepoConfig.URL).
-			Logger()
+		log := log.With(
+			slog.String("targetId", targetId),
+			slog.String("targetUrl", targetRepoConfig.URL),
+		)
 
 		var authMethod transport.AuthMethod
-		authMethod, err = configToAuth(fs, &targetRepoConfig, &log)
+		authMethod, err = configToAuth(fs, &targetRepoConfig, log)
 		if err != nil {
 			err = &GitRepoError{
 				RepoId:  targetId,
@@ -202,7 +200,7 @@ func (this *GitSync) init(
 			Force:      true,
 			Atomic:     false,
 		}
-		err = prepareRemote(this.repo, targetId, &targetRepoConfig, &log)
+		err = prepareRemote(ctx, this.repo, targetId, &targetRepoConfig, log)
 		if err != nil {
 			err = &GitRepoError{
 				RepoId:  targetId,
@@ -232,20 +230,20 @@ func (this *GitSync) Clean(fs billy.Filesystem) error {
 
 func (this *GitSync) RunInLoop(ctx context.Context) error {
 	log := this.getLogger(ctx)
-	ctx = log.WithContext(ctx)
+	ctx = logging.AddToContext(ctx, log)
 	timer := time.NewTimer(0)
 
 	for {
 		select {
 		case <-timer.C:
 			if err := this.RunOnce(ctx); err != nil {
-				log.Error().Err(err).Msgf("sync failed")
+				log.ErrorContext(ctx, "sync failed", slog.Any("error", err))
 			}
 			interval := this.mapping.Interval.Duration
 			if interval <= 0 {
 				interval = time.Hour
 			}
-			log.Debug().Msgf("next sync in %s", interval)
+			log.DebugContext(ctx, "next sync", slog.Duration("interval", interval))
 			timer.Reset(this.mapping.Interval.Duration)
 		case <-ctx.Done():
 			if !timer.Stop() {
@@ -260,7 +258,7 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 	var branches, tags []string
 	var err error
 	log := this.getLogger(ctx)
-	ctx = log.WithContext(ctx)
+	ctx = logging.AddToContext(ctx, log)
 
 	if this.fetchOptions.RemoteURL == "" {
 		// Local branches and tags
@@ -270,19 +268,19 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 		}
 	} else {
 		// Remote branches and tags
-		log.Debug().Msgf("get source remote")
+		log.DebugContext(ctx, "get source remote")
 		sourceRemote, err := this.repo.Remote(this.mapping.Source)
 		if err != nil {
 			return this.sourceRepoError("failed to query remote", err)
 		}
 
-		log.Debug().Msgf("fetch latest commits for source remote")
+		log.DebugContext(ctx, "fetch latest commits for source remote")
 		err = sourceRemote.FetchContext(ctx, &this.fetchOptions)
 		if err != nil && err != git.NoErrAlreadyUpToDate {
 			return this.sourceRepoError("failed to fetch from remote", err)
 		}
 
-		log.Debug().Msgf("get branches and tags for source remote")
+		log.DebugContext(ctx, "get branches and tags for source remote")
 		branches, tags, err = this.getRemoteBranchesAndTags(ctx, sourceRemote)
 		if err != nil {
 			return this.sourceRepoError("failed to fetch branches and tags", err)
@@ -307,16 +305,16 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 	)
 	for targetId, targetOptions := range this.pushOptions {
 		targetRepoConfig := this.repoConfigs[targetId]
-		log := log.With().
-			Str("targetId", targetId).
-			Str("targetUrl", targetRepoConfig.URL).
-			Logger()
+		log := log.With(
+			slog.String("targetId", targetId),
+			slog.String("targetUrl", targetRepoConfig.URL),
+		)
 		targetOptions.RefSpecs = refSpecs
 
-		log.Debug().Msg("push to remote target")
+		log.DebugContext(ctx, "push to remote target")
 		err = this.repo.PushContext(ctx, &targetOptions)
 		if err != nil && err != git.NoErrAlreadyUpToDate {
-			log.Error().Err(err).Msg("failed to push to remote")
+			log.ErrorContext(ctx, "failed to push to remote", slog.Any("error", err))
 			err = &GitRepoError{
 				RepoId:  targetId,
 				RepoURL: targetRepoConfig.URL,
@@ -325,9 +323,9 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 			}
 			errs = append(errs, err)
 		} else if err == git.NoErrAlreadyUpToDate {
-			log.Debug().Msg("remote already up-to-date")
+			log.DebugContext(ctx, "remote already up-to-date")
 		} else {
-			log.Info().Msg("remote update succeeded")
+			log.InfoContext(ctx, "remote update succeeded")
 		}
 	}
 
@@ -379,12 +377,12 @@ func (this *GitSync) getRemoteBranchesAndTags(
 	remote *git.Remote,
 ) (branches []string, tags []string, err error) {
 	var refs []*plumbing.Reference
-	log := zerolog.Ctx(ctx)
+	log := logging.FromContext(ctx)
 
-	log.Debug().Msg("listing refs")
+	log.DebugContext(ctx, "listing refs")
 	refs, err = remote.ListContext(ctx, &this.listOptions)
 	if err == transport.ErrEmptyRemoteRepository {
-		log.Debug().Msg("remote is empty")
+		log.DebugContext(ctx, "remote is empty")
 		return nil, nil, nil
 	}
 	if err != nil {
@@ -410,16 +408,14 @@ func (this *GitSync) getRemoteBranchesAndTags(
 		}
 	}
 
-	log.Debug().
-		Strs("branches", branches).
-		Strs("tags", tags).
-		Msgf("found %d branches and %d tags", len(branches), len(tags))
-	return
-}
-
-func (this *GitSync) branchesAndTagsFromRefs(
-	refs []*plumbing.Reference,
-) (branches []string, tags []string) {
+	log.DebugContext(
+		ctx,
+		"found branches and tags",
+		slog.Int("branchCount", len(branches)),
+		slog.Int("tagCount", len(tags)),
+		slog.String("branches", strings.Join(branches, ", ")),
+		slog.String("tags", strings.Join(tags, ", ")),
+	)
 	return
 }
 
@@ -433,12 +429,14 @@ func matchAny(matchers []matcher.M, s string) bool {
 }
 
 func prepareRemote(
+	ctx context.Context,
 	repo *git.Repository,
 	remoteId string,
 	repoConfig *config.Repository,
-	log *zerolog.Logger,
+	log *slog.Logger,
 ) error {
-	log.Debug().Msgf("querying remote '%s'", remoteId)
+	log = log.With(slog.String("remoteId", remoteId))
+	log.DebugContext(ctx, "querying remote")
 	remote, err := repo.Remote(remoteId)
 
 	if err != nil && err != git.ErrRemoteNotFound {
@@ -446,16 +444,16 @@ func prepareRemote(
 	}
 	if err == nil {
 		if slices.Contains(remote.Config().URLs, repoConfig.URL) {
-			log.Debug().Msgf("remote '%s' configured already", remoteId)
+			log.DebugContext(ctx, "remote configured already")
 			return nil
 		}
-		log.Debug().Msgf("deleting remote '%s' before reconfiguring it", remoteId)
+		log.DebugContext(ctx, "deleting remote before reconfiguring")
 		if err := repo.DeleteRemote(remoteId); err != nil {
 			return fmt.Errorf("failed to delete remote '%s': %w", remoteId, err)
 		}
 	}
 
-	log.Debug().Msgf("creating remote '%s'", remoteId)
+	log.DebugContext(ctx, "creating remote")
 	_, err = repo.CreateRemote(&gitconf.RemoteConfig{
 		Name:   remoteId,
 		URLs:   []string{repoConfig.URL},

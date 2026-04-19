@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"go.lepovirta.org/otk/internal/duration"
@@ -11,7 +12,6 @@ import (
 	"go.lepovirta.org/otk/internal/envvar"
 	"go.lepovirta.org/otk/internal/matcher"
 	"go.lepovirta.org/otk/internal/validation"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -206,9 +206,9 @@ func (this *ConfigSingle) mergeCredentials(credentials map[string]Credentials) {
 			target.merge(&creds)
 			this.Targets[targetId] = target
 		} else {
-			log.Warn().Str("target", targetId).Msgf(
-				"credentials specified for target '%s' but the target is not found in the configuration",
-				targetId,
+			slog.Warn(
+				"credentials specified for target but target not found in configuration",
+				slog.String("target", targetId),
 			)
 		}
 	}
@@ -221,9 +221,9 @@ func (this *Config) mergeCredentials(credentials map[string]Credentials) {
 			repo.merge(&creds)
 			this.Repositories[repoId] = repo
 		} else {
-			log.Warn().Str("repo", repoId).Msgf(
-				"credentials specified for repository '%s' but the repository is not found in the configuration",
-				repoId,
+			slog.Warn(
+				"credentials specified for repository but repository not found in configuration",
+				slog.String("repo", repoId),
 			)
 		}
 	}
@@ -312,7 +312,7 @@ func (this *SshCredentials) resolveEnvVars(parent string, envVars map[string]str
 
 func logEnvVarSubstWarning(err error, field ...string) {
 	fieldCompiled := strings.Join(field, ".")
-	log.Warn().Str("field", fieldCompiled).Err(err).Msg(envVarSubstErrorMsg)
+	slog.Warn(envVarSubstErrorMsg, slog.String("field", fieldCompiled), slog.Any("error", err))
 }
 
 /////////////////////////////////////////////////
@@ -475,7 +475,7 @@ func (this *Config) Parse(
 	config io.Reader,
 	credentials io.Reader,
 ) error {
-	var temp struct{
+	var temp struct {
 		ConfigSingle
 		Config
 	}
@@ -559,21 +559,21 @@ func parseCredentials(credentials io.Reader) (map[string]Credentials, error) {
 
 func (this *Config) fromSingle(cfg *ConfigSingle) {
 	sourceKey := "source"
-	this.Repositories = make(map[string]Repository, len(cfg.Targets) + 1)
+	this.Repositories = make(map[string]Repository, len(cfg.Targets)+1)
 	this.Repositories[sourceKey] = Repository{
 		Credentials: Credentials{
 			TargetAuthMethod: AuthMethodNone,
 		},
 		LocalPath: cfg.Path,
-		URL: "",
-		InMemory: false,
+		URL:       "",
+		InMemory:  false,
 	}
 
 	for targetId, target := range cfg.Targets {
 		this.Repositories[targetId] = target.Repository
 		this.Mappings = append(this.Mappings, SyncMapping{
-			Source: sourceKey,
-			Targets: []string{targetId},
+			Source:   sourceKey,
+			Targets:  []string{targetId},
 			SyncSpec: target.SyncSpec,
 		})
 	}
