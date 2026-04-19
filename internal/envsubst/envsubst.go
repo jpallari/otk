@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	envSubstRe = regexp.MustCompile("\\$?\\$\\{([^}]+)\\}")
+	envSubstRe = regexp.MustCompile(`\$?\$\{([^}]+)\}`)
 )
 
 func Replace(text string, vars map[string]string) (string, error) {
@@ -47,11 +47,11 @@ type KeyError struct {
 	keys []string
 }
 
-func (this *KeyError) MissingKeys() []string {
-	return this.keys
+func (e *KeyError) MissingKeys() []string {
+	return e.keys
 }
 
-func (this *KeyError) Error() string {
-	keysStr := strings.Join(this.keys, ", ")
+func (e *KeyError) Error() string {
+	keysStr := strings.Join(e.keys, ", ")
 	return fmt.Sprintf("no value found for keys: %s", keysStr)
 }

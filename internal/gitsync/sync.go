@@ -46,49 +46,49 @@ type GitSync struct {
 	tempDirPath      string
 }
 
-func (this *GitSync) sourceRepoError(reason string, cause error) *GitRepoError {
+func (gs *GitSync) sourceRepoError(reason string, cause error) *GitRepoError {
 	return &GitRepoError{
-		RepoId:  this.mapping.Source,
-		RepoURL: this.sourceRepoConfig.URL,
+		RepoId:  gs.mapping.Source,
+		RepoURL: gs.sourceRepoConfig.URL,
 		Reason:  reason,
 		Cause:   cause,
 	}
 }
 
-func (this *GitSync) getLogger(ctx context.Context) *slog.Logger {
+func (gs *GitSync) getLogger(ctx context.Context) *slog.Logger {
 	logArgs := make([]any, 0, 2)
-	if this.sourceRepoConfig != nil && this.sourceRepoConfig.URL != "" {
-		logArgs = append(logArgs, slog.String("sourceUrl", this.sourceRepoConfig.URL))
+	if gs.sourceRepoConfig != nil && gs.sourceRepoConfig.URL != "" {
+		logArgs = append(logArgs, slog.String("sourceUrl", gs.sourceRepoConfig.URL))
 	}
-	if this.mapping != nil && this.mapping.Source != "" {
-		logArgs = append(logArgs, slog.String("sourceId", this.mapping.Source))
+	if gs.mapping != nil && gs.mapping.Source != "" {
+		logArgs = append(logArgs, slog.String("sourceId", gs.mapping.Source))
 	}
 	return logging.FromContext(ctx).With(logArgs...)
 }
 
-func (this *GitSync) Init(
+func (gs *GitSync) Init(
 	ctx context.Context,
 	osEnv *osenv.OsEnv,
 	repoConfigs map[string]config.Repository,
 	mapping *config.SyncMapping,
 ) (err error) {
-	err = this.init(ctx, osEnv, repoConfigs, mapping)
+	err = gs.init(ctx, osEnv, repoConfigs, mapping)
 	if err != nil {
-		log := this.getLogger(ctx)
+		log := gs.getLogger(ctx)
 		log.ErrorContext(ctx, "init failed", slog.Any("error", err))
 	}
 	return
 }
 
-func (this *GitSync) init(
+func (gs *GitSync) init(
 	ctx context.Context,
 	osEnv *osenv.OsEnv,
 	repoConfigs map[string]config.Repository,
 	mapping *config.SyncMapping,
 ) (err error) {
 	var ok bool
-	this.repoConfigs = repoConfigs
-	this.mapping = mapping
+	gs.repoConfigs = repoConfigs
+	gs.mapping = mapping
 
 	// Use custom HTTP client
 	httpClient := http.Client{
@@ -98,56 +98,56 @@ func (this *GitSync) init(
 	client.InstallProtocol("https", githttp.NewClient(&httpClient))
 
 	// Source
-	sourceRepoConfig, ok := this.repoConfigs[this.mapping.Source]
+	sourceRepoConfig, ok := gs.repoConfigs[gs.mapping.Source]
 	if !ok {
-		err = fmt.Errorf("no configuration found for repo '%s'", this.mapping.Source)
+		err = fmt.Errorf("no configuration found for repo '%s'", gs.mapping.Source)
 		return
 	}
-	this.sourceRepoConfig = &sourceRepoConfig
+	gs.sourceRepoConfig = &sourceRepoConfig
 
 	// getLogger depends on the above fields, so we can't call it earlier
-	log := this.getLogger(ctx)
+	log := gs.getLogger(ctx)
 
 	// Source authentication
 	var sourceAuth transport.AuthMethod
-	sourceAuth, err = configToAuth(osEnv.Fs, this.sourceRepoConfig, log)
+	sourceAuth, err = configToAuth(osEnv.Fs, gs.sourceRepoConfig, log)
 	if err != nil {
-		err = this.sourceRepoError("failed to configure auth", err)
+		err = gs.sourceRepoError("failed to configure auth", err)
 		return
 	}
-	this.fetchOptions = git.FetchOptions{
-		RemoteURL:  this.sourceRepoConfig.URL,
-		RemoteName: this.mapping.Source,
+	gs.fetchOptions = git.FetchOptions{
+		RemoteURL:  gs.sourceRepoConfig.URL,
+		RemoteName: gs.mapping.Source,
 		Auth:       sourceAuth,
 		Force:      true,
 		RefSpecs:   []gitconf.RefSpec{gitconf.RefSpec(refSpecFetch)},
 	}
-	this.listOptions = git.ListOptions{
+	gs.listOptions = git.ListOptions{
 		Auth: sourceAuth,
 	}
 
 	// Repo storage
 	var storer storage.Storer
 	var path string
-	if this.sourceRepoConfig.InMemory {
+	if gs.sourceRepoConfig.InMemory {
 		path = ""
 		storer = memory.NewStorage()
 	} else {
-		path = this.sourceRepoConfig.LocalPath
+		path = gs.sourceRepoConfig.LocalPath
 		if path == "" {
-			log.DebugContext(ctx, "Preparing temp directory", slog.String("url", this.sourceRepoConfig.URL))
-			path, err = fsutil.TempDir(osEnv.Fs, "", fmt.Sprintf("%s-%s", config.AppName, this.mapping.Source))
+			log.DebugContext(ctx, "Preparing temp directory", slog.String("url", gs.sourceRepoConfig.URL))
+			path, err = fsutil.TempDir(osEnv.Fs, "", fmt.Sprintf("%s-%s", config.AppName, gs.mapping.Source))
 			if err != nil {
-				err = this.sourceRepoError("failed to create temporary directory", err)
+				err = gs.sourceRepoError("failed to create temporary directory", err)
 				return
 			}
-			this.tempDirPath = path // stored for clean-up later
+			gs.tempDirPath = path // stored for clean-up later
 		}
 
 		var pathFs billy.Filesystem
 		pathFs, err = osEnv.Fs.Chroot(path)
 		if err != nil {
-			err = this.sourceRepoError(fmt.Sprintf("failed to chroot path '%s'", path), err)
+			err = gs.sourceRepoError(fmt.Sprintf("failed to chroot path '%s'", path), err)
 			return
 		}
 		storer = filesystem.NewStorage(pathFs, cache.NewObjectLRUDefault())
@@ -155,35 +155,35 @@ func (this *GitSync) init(
 
 	// Initialize repo
 	log.DebugContext(ctx, "initializing repo", slog.String("gitPath", path))
-	this.repo, err = git.Init(storer, nil)
+	gs.repo, err = git.Init(storer, nil)
 	if err != nil && err != git.ErrRepositoryAlreadyExists {
-		err = this.sourceRepoError("failed to initialize repo", err)
+		err = gs.sourceRepoError("failed to initialize repo", err)
 		return
 	}
 	if err == git.ErrRepositoryAlreadyExists {
 		log.DebugContext(ctx, "opening repo", slog.String("path", path))
-		this.repo, err = git.Open(storer, nil)
+		gs.repo, err = git.Open(storer, nil)
 		if err != nil {
-			err = this.sourceRepoError(fmt.Sprintf("failed to open path %s", path), err)
+			err = gs.sourceRepoError(fmt.Sprintf("failed to open path %s", path), err)
 			return
 		}
 	}
 
 	// Prepare source remote
-	if this.sourceRepoConfig.URL == "" {
-		log.InfoContext(ctx, "no remote specified, fetch will be skipped", slog.String("source", this.mapping.Source))
+	if gs.sourceRepoConfig.URL == "" {
+		log.InfoContext(ctx, "no remote specified, fetch will be skipped", slog.String("source", gs.mapping.Source))
 	} else {
-		err = prepareRemote(ctx, this.repo, this.mapping.Source, this.sourceRepoConfig, log)
+		err = prepareRemote(ctx, gs.repo, gs.mapping.Source, gs.sourceRepoConfig, log)
 		if err != nil {
-			err = this.sourceRepoError("failed to prepare remote", err)
+			err = gs.sourceRepoError("failed to prepare remote", err)
 			return
 		}
 	}
 
 	// Configure targets
-	this.pushOptions = make(map[string]git.PushOptions, len(mapping.Targets))
+	gs.pushOptions = make(map[string]git.PushOptions, len(mapping.Targets))
 	for _, targetId := range mapping.Targets {
-		targetRepoConfig, ok := this.repoConfigs[targetId]
+		targetRepoConfig, ok := gs.repoConfigs[targetId]
 		if !ok {
 			err = fmt.Errorf("no configuration found for repo '%s'", targetId)
 			return
@@ -204,14 +204,14 @@ func (this *GitSync) init(
 			}
 			return
 		}
-		this.pushOptions[targetId] = git.PushOptions{
+		gs.pushOptions[targetId] = git.PushOptions{
 			RemoteName: targetId,
 			RemoteURL:  targetRepoConfig.URL,
 			Auth:       authMethod,
 			Force:      true,
 			Atomic:     false,
 		}
-		err = prepareRemote(ctx, this.repo, targetId, &targetRepoConfig, log)
+		err = prepareRemote(ctx, gs.repo, targetId, &targetRepoConfig, log)
 		if err != nil {
 			err = &GitRepoError{
 				RepoId:  targetId,
@@ -226,36 +226,36 @@ func (this *GitSync) init(
 	return nil
 }
 
-func (this *GitSync) Clean(fs billy.Filesystem) error {
-	if this.tempDirPath != "" {
-		err := fsutil.RemoveAll(fs, this.tempDirPath)
+func (gs *GitSync) Clean(fs billy.Filesystem) error {
+	if gs.tempDirPath != "" {
+		err := fsutil.RemoveAll(fs, gs.tempDirPath)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to clean up temp directory '%s': %w",
-				this.tempDirPath, err,
+				gs.tempDirPath, err,
 			)
 		}
 	}
 	return nil
 }
 
-func (this *GitSync) RunInLoop(ctx context.Context) error {
-	log := this.getLogger(ctx)
+func (gs *GitSync) RunInLoop(ctx context.Context) error {
+	log := gs.getLogger(ctx)
 	ctx = logging.AddToContext(ctx, log)
 	timer := time.NewTimer(0)
 
 	for {
 		select {
 		case <-timer.C:
-			if err := this.RunOnce(ctx); err != nil {
+			if err := gs.RunOnce(ctx); err != nil {
 				log.ErrorContext(ctx, "sync failed", slog.Any("error", err))
 			}
-			interval := this.mapping.Interval.Duration
+			interval := gs.mapping.Interval.Duration
 			if interval <= 0 {
 				interval = time.Hour
 			}
 			log.DebugContext(ctx, "next sync", slog.Duration("interval", interval))
-			timer.Reset(this.mapping.Interval.Duration)
+			timer.Reset(gs.mapping.Interval.Duration)
 		case <-ctx.Done():
 			if !timer.Stop() {
 				<-timer.C
@@ -265,36 +265,36 @@ func (this *GitSync) RunInLoop(ctx context.Context) error {
 	}
 }
 
-func (this *GitSync) RunOnce(ctx context.Context) error {
+func (gs *GitSync) RunOnce(ctx context.Context) error {
 	var branches, tags []string
 	var err error
-	log := this.getLogger(ctx)
+	log := gs.getLogger(ctx)
 	ctx = logging.AddToContext(ctx, log)
 
-	if this.fetchOptions.RemoteURL == "" {
+	if gs.fetchOptions.RemoteURL == "" {
 		// Local branches and tags
-		branches, tags, err = this.getLocalBranchesAndTags()
+		branches, tags, err = gs.getLocalBranchesAndTags()
 		if err != nil {
-			return this.sourceRepoError("failed to query local", err)
+			return gs.sourceRepoError("failed to query local", err)
 		}
 	} else {
 		// Remote branches and tags
 		log.DebugContext(ctx, "get source remote")
-		sourceRemote, err := this.repo.Remote(this.mapping.Source)
+		sourceRemote, err := gs.repo.Remote(gs.mapping.Source)
 		if err != nil {
-			return this.sourceRepoError("failed to query remote", err)
+			return gs.sourceRepoError("failed to query remote", err)
 		}
 
 		log.DebugContext(ctx, "fetch latest commits for source remote")
-		err = sourceRemote.FetchContext(ctx, &this.fetchOptions)
+		err = sourceRemote.FetchContext(ctx, &gs.fetchOptions)
 		if err != nil && err != git.NoErrAlreadyUpToDate {
-			return this.sourceRepoError("failed to fetch from remote", err)
+			return gs.sourceRepoError("failed to fetch from remote", err)
 		}
 
 		log.DebugContext(ctx, "get branches and tags for source remote")
-		branches, tags, err = this.getRemoteBranchesAndTags(ctx, sourceRemote)
+		branches, tags, err = gs.getRemoteBranchesAndTags(ctx, sourceRemote)
 		if err != nil {
-			return this.sourceRepoError("failed to fetch branches and tags", err)
+			return gs.sourceRepoError("failed to fetch branches and tags", err)
 		}
 		if len(branches) == 0 && len(tags) == 0 {
 			return nil
@@ -312,10 +312,10 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 	errs := make(
 		[]error,
 		0,
-		len(this.pushOptions)*len(branches)+len(this.pushOptions)*len(tags),
+		len(gs.pushOptions)*len(branches)+len(gs.pushOptions)*len(tags),
 	)
-	for targetId, targetOptions := range this.pushOptions {
-		targetRepoConfig := this.repoConfigs[targetId]
+	for targetId, targetOptions := range gs.pushOptions {
+		targetRepoConfig := gs.repoConfigs[targetId]
 		log := log.With(
 			slog.String("targetId", targetId),
 			slog.String("targetUrl", targetRepoConfig.URL),
@@ -323,7 +323,7 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 		targetOptions.RefSpecs = refSpecs
 
 		log.DebugContext(ctx, "push to remote target")
-		err = this.repo.PushContext(ctx, &targetOptions)
+		err = gs.repo.PushContext(ctx, &targetOptions)
 		if err != nil && err != git.NoErrAlreadyUpToDate {
 			log.ErrorContext(ctx, "failed to push to remote", slog.Any("error", err))
 			err = &GitRepoError{
@@ -343,7 +343,7 @@ func (this *GitSync) RunOnce(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (this *GitSync) getLocalBranchesAndTags() (
+func (gs *GitSync) getLocalBranchesAndTags() (
 	branches []string,
 	tags []string,
 	err error,
@@ -352,29 +352,29 @@ func (this *GitSync) getLocalBranchesAndTags() (
 	tags = make([]string, 0, 1000)
 	var refIter storer.ReferenceIter
 
-	refIter, err = this.repo.Branches()
+	refIter, err = gs.repo.Branches()
 	if err != nil {
 		err = fmt.Errorf("local branch iterator error: %w", err)
 		return
 	}
 
-	refIter.ForEach(func(ref *plumbing.Reference) error {
+	_ = refIter.ForEach(func(ref *plumbing.Reference) error {
 		branch := ref.Name().Short()
-		if matchAny(this.mapping.Branches, branch) {
+		if matchAny(gs.mapping.Branches, branch) {
 			branches = append(branches, branch)
 		}
 		return nil
 	})
 
-	refIter, err = this.repo.Tags()
+	refIter, err = gs.repo.Tags()
 	if err != nil {
 		err = fmt.Errorf("local tags iterator error: %w", err)
 		return
 	}
 
-	refIter.ForEach(func(ref *plumbing.Reference) error {
+	_ = refIter.ForEach(func(ref *plumbing.Reference) error {
 		tag := ref.Name().Short()
-		if matchAny(this.mapping.Tags, tag) {
+		if matchAny(gs.mapping.Tags, tag) {
 			tags = append(tags, tag)
 		}
 		return nil
@@ -383,7 +383,7 @@ func (this *GitSync) getLocalBranchesAndTags() (
 	return
 }
 
-func (this *GitSync) getRemoteBranchesAndTags(
+func (gs *GitSync) getRemoteBranchesAndTags(
 	ctx context.Context,
 	remote *git.Remote,
 ) (branches []string, tags []string, err error) {
@@ -391,13 +391,13 @@ func (this *GitSync) getRemoteBranchesAndTags(
 	log := logging.FromContext(ctx)
 
 	log.DebugContext(ctx, "listing refs")
-	refs, err = remote.ListContext(ctx, &this.listOptions)
+	refs, err = remote.ListContext(ctx, &gs.listOptions)
 	if err == transport.ErrEmptyRemoteRepository {
 		log.DebugContext(ctx, "remote is empty")
 		return nil, nil, nil
 	}
 	if err != nil {
-		err = fmt.Errorf("failed to list refs for remote '%s': %w", this.mapping.Source, err)
+		err = fmt.Errorf("failed to list refs for remote '%s': %w", gs.mapping.Source, err)
 		return
 	}
 
@@ -408,12 +408,12 @@ func (this *GitSync) getRemoteBranchesAndTags(
 		refName := ref.Name().String()
 		if after, ok := strings.CutPrefix(refName, refPrefixBranch); ok {
 			branch := after
-			if matchAny(this.mapping.Branches, branch) {
+			if matchAny(gs.mapping.Branches, branch) {
 				branches = append(branches, branch)
 			}
 		} else if after, ok := strings.CutPrefix(refName, refPrefixTag); ok {
 			tag := after
-			if matchAny(this.mapping.Tags, tag) {
+			if matchAny(gs.mapping.Tags, tag) {
 				tags = append(tags, tag)
 			}
 		}
@@ -504,20 +504,20 @@ type GitRepoError struct {
 	Cause   error
 }
 
-func (this *GitRepoError) Error() string {
-	if this.Cause == nil {
+func (e *GitRepoError) Error() string {
+	if e.Cause == nil {
 		return fmt.Sprintf(
 			"%s in '%s' (url: %s)",
-			this.Reason,
-			this.RepoId,
-			this.RepoURL,
+			e.Reason,
+			e.RepoId,
+			e.RepoURL,
 		)
 	}
 	return fmt.Sprintf(
 		"%s in git repo '%s' (url: %s): %s",
-		this.Reason,
-		this.RepoId,
-		this.RepoURL,
-		this.Cause.Error(),
+		e.Reason,
+		e.RepoId,
+		e.RepoURL,
+		e.Cause.Error(),
 	)
 }

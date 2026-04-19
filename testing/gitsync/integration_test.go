@@ -19,12 +19,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"go.lepovirta.org/otk/internal/gitsync"
-	"go.lepovirta.org/otk/internal/osenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"go.lepovirta.org/otk/internal/gitsync"
+	"go.lepovirta.org/otk/internal/osenv"
 	"golang.org/x/crypto/ssh"
 )
 

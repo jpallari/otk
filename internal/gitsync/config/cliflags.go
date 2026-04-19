@@ -17,17 +17,17 @@ type CliFlags struct {
 	CredentialsPath string
 }
 
-func (this *CliFlags) validate() error {
-	if this.ConfigPath == "" {
+func (f *CliFlags) validate() error {
+	if f.ConfigPath == "" {
 		return fmt.Errorf("config path not specified")
 	}
-	if this.ConfigPath == StdinPath && this.CredentialsPath == StdinPath {
+	if f.ConfigPath == StdinPath && f.CredentialsPath == StdinPath {
 		return fmt.Errorf("loading config and credentials from STDIN at the same time is not supported")
 	}
 	return nil
 }
 
-func (this *CliFlags) Parse(
+func (f *CliFlags) Parse(
 	envVars envvar.Vars,
 	args []string,
 	output io.Writer,
@@ -36,7 +36,7 @@ func (this *CliFlags) Parse(
 	flagSet.Init(AppName, flag.ContinueOnError)
 	flagSet.SetOutput(output)
 	flagSet.Usage = func() {
-		fmt.Fprintf(
+		_, _ = fmt.Fprintf(
 			flagSet.Output(),
 			"Usage: %s [-config <path>] [-credentials <path>] [-once] [-run] [-h | --help]\n\nOptions:\n",
 			args[0],
@@ -45,25 +45,25 @@ func (this *CliFlags) Parse(
 	}
 
 	flagSet.BoolVar(
-		&this.Run,
+		&f.Run,
 		"run",
 		false,
 		"Run the Git sync. If not enabled, a dry run will be executed instead.",
 	)
 	flagSet.BoolVar(
-		&this.Once,
+		&f.Once,
 		"once",
 		false,
 		"Run Git sync only once instead of the repeatedly as specified in the configuration.",
 	)
 	flagSet.StringVar(
-		&this.ConfigPath,
+		&f.ConfigPath,
 		"config",
 		"-",
 		"Path to a configuration file. Use '-' to read from STDIN. By default, config is read from STDIN.",
 	)
 	flagSet.StringVar(
-		&this.CredentialsPath,
+		&f.CredentialsPath,
 		"credentials",
 		"",
 		"Path to a credentials file. Use '-' to read from STDIN.",
@@ -74,12 +74,12 @@ func (this *CliFlags) Parse(
 	}
 
 	// Fall back to env vars
-	if this.ConfigPath == "" {
-		this.ConfigPath = envVars.GetForApp(AppName, "CONFIG_PATH")
+	if f.ConfigPath == "" {
+		f.ConfigPath = envVars.GetForApp(AppName, "CONFIG_PATH")
 	}
-	if this.CredentialsPath == "" {
-		this.CredentialsPath = envVars.GetForApp(AppName, "CREDENTIALS")
+	if f.CredentialsPath == "" {
+		f.CredentialsPath = envVars.GetForApp(AppName, "CREDENTIALS")
 	}
 
-	return this.validate()
+	return f.validate()
 }

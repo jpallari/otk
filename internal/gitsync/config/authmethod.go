@@ -33,9 +33,9 @@ const (
 	AuthMethodSshKey
 )
 
-func (this AuthMethod) MarshalJSON() ([]byte, error) {
+func (a AuthMethod) MarshalJSON() ([]byte, error) {
 	var s string
-	switch this {
+	switch a {
 	case AuthMethodUndefined:
 		return json.Marshal(nil)
 	case AuthMethodNone:
@@ -49,37 +49,37 @@ func (this AuthMethod) MarshalJSON() ([]byte, error) {
 	case AuthMethodSshKey:
 		s = "ssh"
 	default:
-		return nil, fmt.Errorf("unknown auth method '%s'", this)
+		return nil, fmt.Errorf("unknown auth method '%s'", a)
 	}
 	return json.Marshal(s)
 }
 
-func (this *AuthMethod) UnmarshalJSON(b []byte) error {
+func (a *AuthMethod) UnmarshalJSON(b []byte) error {
 	var v string
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
 	switch strings.ToLower(v) {
 	case "", "undefined":
-		*this = AuthMethodUndefined
+		*a = AuthMethodUndefined
 	case "none", "disabled":
-		*this = AuthMethodNone
+		*a = AuthMethodNone
 	case "http-token":
-		*this = AuthMethodHttpToken
+		*a = AuthMethodHttpToken
 	case "http", "http-basic":
-		*this = AuthMethodHttpCredentials
+		*a = AuthMethodHttpCredentials
 	case "ssh-agent":
-		*this = AuthMethodSshAgent
+		*a = AuthMethodSshAgent
 	case "ssh", "ssh-key":
-		*this = AuthMethodSshKey
+		*a = AuthMethodSshKey
 	default:
 		return fmt.Errorf("unexpected value '%s' for auth method", v)
 	}
 	return nil
 }
 
-func (this AuthMethod) String() string {
-	switch this {
+func (a AuthMethod) String() string {
+	switch a {
 	case AuthMethodUndefined:
 		return ""
 	case AuthMethodNone:
@@ -93,6 +93,6 @@ func (this AuthMethod) String() string {
 	case AuthMethodSshKey:
 		return "ssh"
 	default:
-		return fmt.Sprintf("unknown(%d)", this)
+		return fmt.Sprintf("unknown(%d)", a)
 	}
 }

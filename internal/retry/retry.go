@@ -38,22 +38,22 @@ func ExponentialBackoff(minDelay, maxDelay time.Duration) DelayFunc {
 	}
 }
 
-func (this DelayFunc) WithFullJitter(
+func (f DelayFunc) WithFullJitter(
 	rand rand.Rand,
 ) DelayFunc {
 	return func(attemptNr int) time.Duration {
-		delay := this(attemptNr)
+		delay := f(attemptNr)
 		r := rand.Float64()
 		return time.Duration(float64(delay) * r)
 	}
 }
 
-func (this DelayFunc) WithJitter(
+func (f DelayFunc) WithJitter(
 	rand rand.Rand,
 	maxJitter time.Duration,
 ) DelayFunc {
 	return func(attemptNr int) time.Duration {
-		delay := this(attemptNr)
+		delay := f(attemptNr)
 
 		jitterBase := min(delay/2, maxJitter)
 
@@ -108,8 +108,8 @@ type cancelError struct {
 	Cause error
 }
 
-func (this *cancelError) Error() string {
-	return this.Cause.Error()
+func (e *cancelError) Error() string {
+	return e.Cause.Error()
 }
 
 func Cancel(err error) error {

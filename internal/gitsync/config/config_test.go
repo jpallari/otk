@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.lepovirta.org/otk/internal/duration"
 	"go.lepovirta.org/otk/internal/envvar"
 	"go.lepovirta.org/otk/internal/matcher"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var envVarsMap = map[string]string{

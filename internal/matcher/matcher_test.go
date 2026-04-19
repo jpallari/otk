@@ -18,7 +18,7 @@ func TestMatcherParsing(t *testing.T) {
 		require.NoError(json.Unmarshal([]byte(matcherJson), &matcher))
 		matcherBytes, err := json.Marshal(&matcher)
 		require.NoError(err)
-		
+
 		assert.True(matcher.UsesRegex())
 		assert.Equal(`/v[0-9]+\.[0-9]+\.[0-9]+/`, matcher.String())
 		assert.Equal([]byte(matcherJson), matcherBytes)
@@ -33,7 +33,7 @@ func TestMatcherParsing(t *testing.T) {
 		require.NoError(json.Unmarshal([]byte(matcherJson), &matcher))
 		matcherBytes, err := json.Marshal(&matcher)
 		require.NoError(err)
-		
+
 		assert.False(matcher.UsesRegex())
 		assert.Equal("v1.2.3", matcher.String())
 		assert.Equal([]byte(matcherJson), matcherBytes)
@@ -48,7 +48,7 @@ func TestMatcherParsing(t *testing.T) {
 		require.NoError(json.Unmarshal([]byte(matcherJson), &matcher))
 		matcherBytes, err := json.Marshal(&matcher)
 		require.NoError(err)
-		
+
 		assert.True(matcher.UsesRegex())
 		assert.Equal("/main.*/", matcher.String())
 		assert.Equal([]byte(`"/main.*/"`), matcherBytes)
@@ -63,7 +63,7 @@ func TestMatcherParsing(t *testing.T) {
 		require.NoError(json.Unmarshal([]byte(matcherJson), &matcher))
 		matcherBytes, err := json.Marshal(&matcher)
 		require.NoError(err)
-		
+
 		assert.False(matcher.UsesRegex())
 		assert.Equal("main", matcher.String())
 		assert.Equal([]byte(`"main"`), matcherBytes)

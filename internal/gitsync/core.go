@@ -21,17 +21,17 @@ type Core struct {
 	cfg      config.Config
 }
 
-func (this *Core) Init(osEnv osenv.OsEnv) error {
-	this.osEnv = osEnv
+func (c *Core) Init(osEnv osenv.OsEnv) error {
+	c.osEnv = osEnv
 
 	var logConfig logging.Config
-	logConfig.FromEnv(config.AppName, this.osEnv.EnvVars)
-	logConfig.SetupGlobal(config.AppName, this.osEnv.Stderr)
+	logConfig.FromEnv(config.AppName, c.osEnv.EnvVars)
+	logConfig.SetupGlobal(config.AppName, c.osEnv.Stderr)
 
-	if err := this.cliFlags.Parse(
-		this.osEnv.EnvVars,
-		this.osEnv.Args,
-		this.osEnv.Stderr,
+	if err := c.cliFlags.Parse(
+		c.osEnv.EnvVars,
+		c.osEnv.Args,
+		c.osEnv.Stderr,
 	); err != nil {
 		if err == flag.ErrHelp {
 			return err
@@ -39,48 +39,48 @@ func (this *Core) Init(osEnv osenv.OsEnv) error {
 		return fmt.Errorf("failed to parse CLI flags: %w", err)
 	}
 
-	if err := parseConfig(this.osEnv, &this.cliFlags, &this.cfg); err != nil {
+	if err := parseConfig(c.osEnv, &c.cliFlags, &c.cfg); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 	return nil
 }
 
-func (this *Core) Run(ctx context.Context) error {
+func (c *Core) Run(ctx context.Context) error {
 	log := logging.FromContext(ctx)
 
-	if !this.cliFlags.Run {
+	if !c.cliFlags.Run {
 		log.DebugContext(ctx, "run dry-run")
-		return this.dryRun()
+		return c.dryRun()
 	}
 
-	if this.cliFlags.Once {
+	if c.cliFlags.Once {
 		log.DebugContext(ctx, "run once")
-		return this.runOnce(ctx)
+		return c.runOnce(ctx)
 	}
 	log.DebugContext(ctx, "run in a loop")
-	return this.runLoop(ctx)
+	return c.runLoop(ctx)
 }
 
-func (this *Core) dryRun() error {
-	return dryRun(this.osEnv.Stdout, &this.cfg)
+func (c *Core) dryRun() error {
+	return dryRun(c.osEnv.Stdout, &c.cfg)
 }
 
-func (this *Core) runOnce(ctx context.Context) error {
+func (c *Core) runOnce(ctx context.Context) error {
 	ctx, sigCancel := sighandle.CancelOnSignals(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer sigCancel()
 
 	log := logging.FromContext(ctx)
 
 	cleanUp := func(gitSync *GitSync) {
-		if err := gitSync.Clean(this.osEnv.Fs); err != nil {
+		if err := gitSync.Clean(c.osEnv.Fs); err != nil {
 			log.ErrorContext(ctx, "cleanup failed", slog.Any("error", err))
 		}
 	}
 
-	errs := make([]error, 0, len(this.cfg.Mappings))
+	errs := make([]error, 0, len(c.cfg.Mappings))
 	var gitSync GitSync
-	for _, mapping := range this.cfg.Mappings {
-		if err := gitSync.Init(ctx, &this.osEnv, this.cfg.Repositories, &mapping); err != nil {
+	for _, mapping := range c.cfg.Mappings {
+		if err := gitSync.Init(ctx, &c.osEnv, c.cfg.Repositories, &mapping); err != nil {
 			cleanUp(&gitSync)
 			errs = append(errs, err)
 			continue
@@ -93,22 +93,22 @@ func (this *Core) runOnce(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (this *Core) runLoop(ctx context.Context) error {
+func (c *Core) runLoop(ctx context.Context) error {
 	ctx, sigCancel := sighandle.CancelOnSignals(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer sigCancel()
 
 	log := logging.FromContext(ctx)
 
 	cleanUp := func(gitSync *GitSync) {
-		if err := gitSync.Clean(this.osEnv.Fs); err != nil {
+		if err := gitSync.Clean(c.osEnv.Fs); err != nil {
 			log.ErrorContext(ctx, "cleanup failed", slog.Any("error", err))
 		}
 	}
 
-	gitSyncs := make([]GitSync, len(this.cfg.Mappings))
-	for i, mapping := range this.cfg.Mappings {
+	gitSyncs := make([]GitSync, len(c.cfg.Mappings))
+	for i, mapping := range c.cfg.Mappings {
 		gitSync := &gitSyncs[i]
-		if err := gitSync.Init(ctx, &this.osEnv, this.cfg.Repositories, &mapping); err != nil {
+		if err := gitSync.Init(ctx, &c.osEnv, c.cfg.Repositories, &mapping); err != nil {
 			cleanUp(gitSync)
 			return err
 		}

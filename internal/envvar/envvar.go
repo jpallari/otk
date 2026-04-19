@@ -10,28 +10,28 @@ type Vars struct {
 	vars []string
 }
 
-func (this *Vars) FromSlice(slice []string) error {
+func (vs *Vars) FromSlice(slice []string) error {
 	for i, v := range slice {
 		if !strings.Contains(v, "=") {
 			return &FormatError{index: i, value: v}
 		}
 	}
 
-	this.vars = slice
+	vs.vars = slice
 	return nil
 }
 
-func (this *Vars) FromMap(m map[string]string) {
-	this.vars = make([]string, 0, len(m))
+func (vs *Vars) FromMap(m map[string]string) {
+	vs.vars = make([]string, 0, len(m))
 	for k, v := range m {
 		kv := fmt.Sprintf("%s=%s", k, v)
-		this.vars = append(this.vars, kv)
+		vs.vars = append(vs.vars, kv)
 	}
 }
 
-func (this *Vars) ToMap() map[string]string {
-	m := make(map[string]string, len(this.vars))
-	for _, kv := range this.vars {
+func (vs *Vars) ToMap() map[string]string {
+	m := make(map[string]string, len(vs.vars))
+	for _, kv := range vs.vars {
 		parts := strings.SplitN(kv, "=", 2)
 		if len(parts) < 2 {
 			panic(fmt.Sprintf("not enough parts in env var '%s'", kv))
@@ -41,17 +41,17 @@ func (this *Vars) ToMap() map[string]string {
 	return m
 }
 
-func (this *Vars) FromEnv() {
-	this.vars = os.Environ()
+func (vs *Vars) FromEnv() {
+	vs.vars = os.Environ()
 }
 
-func (this *Vars) All() []string {
-	return this.vars
+func (vs *Vars) All() []string {
+	return vs.vars
 }
 
-func (this *Vars) Lookup(key string) (string, bool) {
+func (vs *Vars) Lookup(key string) (string, bool) {
 	key = key + "="
-	for _, entry := range this.vars {
+	for _, entry := range vs.vars {
 		if strings.HasPrefix(entry, key) {
 			v := entry[len(key):]
 			return v, true
@@ -60,29 +60,29 @@ func (this *Vars) Lookup(key string) (string, bool) {
 	return "", false
 }
 
-func (this *Vars) LookupForApp(appName, varName string) (string, bool) {
-	return this.Lookup(AppKey(appName, varName))
+func (vs *Vars) LookupForApp(appName, varName string) (string, bool) {
+	return vs.Lookup(AppKey(appName, varName))
 }
 
-func (this *Vars) Get(key string) string {
-	v, _ := this.Lookup(key)
+func (vs *Vars) Get(key string) string {
+	v, _ := vs.Lookup(key)
 	return v
 }
 
-func (this *Vars) GetOr(key string, alternative string) string {
-	v, ok := this.Lookup(key)
+func (vs *Vars) GetOr(key string, alternative string) string {
+	v, ok := vs.Lookup(key)
 	if ok {
 		return v
 	}
 	return alternative
 }
 
-func (this *Vars) GetForApp(appName, varName string) string {
-	return this.Get(AppKey(appName, varName))
+func (vs *Vars) GetForApp(appName, varName string) string {
+	return vs.Get(AppKey(appName, varName))
 }
 
-func (this *Vars) GetForAppOr(appName, varName string, alternative string) string {
-	return this.GetOr(AppKey(appName, varName), alternative)
+func (vs *Vars) GetForAppOr(appName, varName string, alternative string) string {
+	return vs.GetOr(AppKey(appName, varName), alternative)
 }
 
 func AppKey(appName, varName string) string {
@@ -107,17 +107,17 @@ type FormatError struct {
 	value string
 }
 
-func (this *FormatError) Index() int {
-	return this.index
+func (e *FormatError) Index() int {
+	return e.index
 }
 
-func (this *FormatError) Value() string {
-	return this.value
+func (e *FormatError) Value() string {
+	return e.value
 }
 
-func (this *FormatError) Error() string {
+func (e *FormatError) Error() string {
 	return fmt.Sprintf(
 		"invalid var format at index %d: %s",
-		this.index, this.value,
+		e.index, e.value,
 	)
 }

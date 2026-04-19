@@ -20,12 +20,12 @@ type OsEnv struct {
 	HttpTransport http.RoundTripper
 }
 
-func (this *OsEnv) FromRealEnv() {
-	this.Args = os.Args
-	this.Fs = osfs.New("")
-	this.EnvVars.FromEnv()
-	this.Stdin = os.Stdin
-	this.Stdout = os.Stdout
-	this.Stderr = os.Stderr
-	this.HttpTransport = http.DefaultTransport
+func (e *OsEnv) FromRealEnv() {
+	e.Args = os.Args
+	e.Fs = osfs.New("")
+	e.EnvVars.FromEnv()
+	e.Stdin = os.Stdin
+	e.Stdout = os.Stdout
+	e.Stderr = os.Stderr
+	e.HttpTransport = http.DefaultTransport
 }

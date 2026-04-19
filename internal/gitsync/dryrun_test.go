@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.lepovirta.org/otk/internal/duration"
 	"go.lepovirta.org/otk/internal/gitsync/config"
 	"go.lepovirta.org/otk/internal/matcher"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var testConfig = config.Config{
@@ -134,7 +134,6 @@ sync: yahe-github --> yahe-gitlab
       branches = main
       tags = /release-.*/
 `
-
 
 func TestDryRun(t *testing.T) {
 	assert := assert.New(t)

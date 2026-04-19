@@ -5,29 +5,29 @@ type Stack struct {
 	elements  []int
 }
 
-func (this *Stack) InitWithBuf(buf []int) {
-	this.nextIndex = 0
-	this.elements = buf
+func (s *Stack) InitWithBuf(buf []int) {
+	s.nextIndex = 0
+	s.elements = buf
 }
 
-func (this *Stack) Init(capacity int) {
-	this.nextIndex = 0
-	this.elements = make([]int, capacity)
+func (s *Stack) Init(capacity int) {
+	s.nextIndex = 0
+	s.elements = make([]int, capacity)
 }
 
-func (this *Stack) Push(i int) bool {
-	if this.nextIndex >= cap(this.elements) {
+func (s *Stack) Push(i int) bool {
+	if s.nextIndex >= cap(s.elements) {
 		return false
 	}
-	this.elements[this.nextIndex] = i
-	this.nextIndex += 1
+	s.elements[s.nextIndex] = i
+	s.nextIndex += 1
 	return true
 }
 
-func (this *Stack) Pop() (int, bool) {
-	if this.nextIndex <= 0 {
+func (s *Stack) Pop() (int, bool) {
+	if s.nextIndex <= 0 {
 		return 0, false
 	}
-	this.nextIndex -= 1
-	return this.elements[this.nextIndex], true
+	s.nextIndex -= 1
+	return s.elements[s.nextIndex], true
 }

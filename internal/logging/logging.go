@@ -26,49 +26,49 @@ type FieldNames struct {
 
 type loggerCtxKey struct{}
 
-func (this *Config) FromEnv(appName string, envVars envvar.Vars) {
-	this.Level = envVars.GetForApp(appName, "LOG_LEVEL")
-	this.Format = envVars.GetForApp(appName, "LOG_FORMAT")
-	this.FieldNames.FromEnv(appName, envVars)
+func (c *Config) FromEnv(appName string, envVars envvar.Vars) {
+	c.Level = envVars.GetForApp(appName, "LOG_LEVEL")
+	c.Format = envVars.GetForApp(appName, "LOG_FORMAT")
+	c.FieldNames.FromEnv(appName, envVars)
 }
 
-func (this *FieldNames) FromEnv(appName string, envVars envvar.Vars) {
-	this.Timestamp = envVars.GetForAppOr(
+func (fn *FieldNames) FromEnv(appName string, envVars envvar.Vars) {
+	fn.Timestamp = envVars.GetForAppOr(
 		appName, "LOG_FIELD_TIMESTAMP", slog.TimeKey,
 	)
-	this.Message = envVars.GetForAppOr(
+	fn.Message = envVars.GetForAppOr(
 		appName, "LOG_FIELD_MESSAGE", slog.MessageKey,
 	)
-	this.Level = envVars.GetForAppOr(
+	fn.Level = envVars.GetForAppOr(
 		appName, "LOG_FIELD_LEVEL", slog.LevelKey,
 	)
-	this.Source = envVars.GetForAppOr(
+	fn.Source = envVars.GetForAppOr(
 		appName, "LOG_FIELD_SOURCE", slog.SourceKey,
 	)
 }
 
-func (this *FieldNames) mapLogKey(key string) string {
+func (fn *FieldNames) mapLogKey(key string) string {
 	switch key {
 	case slog.TimeKey:
-		return this.Timestamp
+		return fn.Timestamp
 	case slog.MessageKey:
-		return this.Message
+		return fn.Message
 	case slog.LevelKey:
-		return this.Level
+		return fn.Level
 	case slog.SourceKey:
-		return this.Source
+		return fn.Source
 	}
 	return key
 }
 
-func (this *Config) SetupGlobal(
+func (c *Config) SetupGlobal(
 	appName string,
 	outStream io.Writer,
 ) {
 	var err error
 
 	var level slog.Level
-	switch strings.ToLower(this.Level) {
+	switch strings.ToLower(c.Level) {
 	case "debug":
 		level = slog.LevelDebug
 	case "info", "":
@@ -79,21 +79,21 @@ func (this *Config) SetupGlobal(
 		level = slog.LevelError
 	default:
 		level = slog.LevelInfo
-		err = fmt.Errorf("unknown log level %s", this.Level)
+		err = fmt.Errorf("unknown log level %s", c.Level)
 	}
 
 	handlerOpts := slog.HandlerOptions{
-		AddSource: this.AddSource,
+		AddSource: c.AddSource,
 		Level:     level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if len(groups) == 0 {
-				a.Key = this.FieldNames.mapLogKey(a.Key)
+				a.Key = c.FieldNames.mapLogKey(a.Key)
 			}
 			return a
 		},
 	}
 
-	handler := logFormatToOutput(this.Format, outStream, &handlerOpts)
+	handler := logFormatToOutput(c.Format, outStream, &handlerOpts)
 	logger := slog.New(
 		handler.WithAttrs([]slog.Attr{
 			slog.String("app", appName),
@@ -102,10 +102,10 @@ func (this *Config) SetupGlobal(
 	slog.SetDefault(logger)
 
 	if err != nil {
-		logger.Warn("unknown log level", slog.String("level", this.Level))
+		logger.Warn("unknown log level", slog.String("level", c.Level))
 	}
-	if strings.ToLower(this.Format) != "json" && strings.ToLower(this.Format) != "pretty" && this.Format != "" {
-		logger.Warn("unknown log format", slog.String("format", this.Format))
+	if strings.ToLower(c.Format) != "json" && strings.ToLower(c.Format) != "pretty" && c.Format != "" {
+		logger.Warn("unknown log format", slog.String("format", c.Format))
 	}
 }
 

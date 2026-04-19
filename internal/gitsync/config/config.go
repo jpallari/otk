@@ -168,43 +168,43 @@ type SyncSpec struct {
 // Auth method
 /////////////////////////////////////////////////
 
-func (this *Credentials) AuthMethod() AuthMethod {
-	if this.TargetAuthMethod != AuthMethodUndefined {
-		return this.TargetAuthMethod
+func (c *Credentials) AuthMethod() AuthMethod {
+	if c.TargetAuthMethod != AuthMethodUndefined {
+		return c.TargetAuthMethod
 	}
-	if this.HttpToken != "" {
+	if c.HttpToken != "" {
 		return AuthMethodHttpToken
 	}
-	if this.HttpCredentials.enabled() {
+	if c.HttpCredentials.enabled() {
 		return AuthMethodHttpCredentials
 	}
-	if this.SshCredentials.UseAgent {
+	if c.SshCredentials.UseAgent {
 		return AuthMethodSshAgent
 	}
-	if this.SshCredentials.keyEnabled() {
+	if c.SshCredentials.keyEnabled() {
 		return AuthMethodSshKey
 	}
 	return AuthMethodNone
 }
 
-func (this *SshCredentials) keyEnabled() bool {
-	return this.KeyPath != ""
+func (s *SshCredentials) keyEnabled() bool {
+	return s.KeyPath != ""
 }
 
-func (this *HttpCredentials) enabled() bool {
-	return this.Username != "" && this.Password != ""
+func (h *HttpCredentials) enabled() bool {
+	return h.Username != "" && h.Password != ""
 }
 
 /////////////////////////////////////////////////
 // Credentials merge
 /////////////////////////////////////////////////
 
-func (this *ConfigSingle) mergeCredentials(credentials map[string]Credentials) {
+func (cs *ConfigSingle) mergeCredentials(credentials map[string]Credentials) {
 	for targetId, creds := range credentials {
-		target, ok := this.Targets[targetId]
+		target, ok := cs.Targets[targetId]
 		if ok {
 			target.merge(&creds)
-			this.Targets[targetId] = target
+			cs.Targets[targetId] = target
 		} else {
 			slog.Warn(
 				"credentials specified for target but target not found in configuration",
@@ -214,12 +214,12 @@ func (this *ConfigSingle) mergeCredentials(credentials map[string]Credentials) {
 	}
 }
 
-func (this *Config) mergeCredentials(credentials map[string]Credentials) {
+func (cfg *Config) mergeCredentials(credentials map[string]Credentials) {
 	for repoId, creds := range credentials {
-		repo, ok := this.Repositories[repoId]
+		repo, ok := cfg.Repositories[repoId]
 		if ok {
 			repo.merge(&creds)
-			this.Repositories[repoId] = repo
+			cfg.Repositories[repoId] = repo
 		} else {
 			slog.Warn(
 				"credentials specified for repository but repository not found in configuration",
@@ -229,82 +229,82 @@ func (this *Config) mergeCredentials(credentials map[string]Credentials) {
 	}
 }
 
-func (this *Credentials) merge(other *Credentials) {
-	overrideStr(&this.HttpToken, other.HttpToken)
-	overrideStr(&this.HttpCredentials.Username, other.HttpCredentials.Username)
-	overrideStr(&this.HttpCredentials.Password, other.HttpCredentials.Password)
-	overrideBool(&this.SshCredentials.UseAgent, other.SshCredentials.UseAgent)
-	overrideStr(&this.SshCredentials.Username, other.SshCredentials.Username)
-	overrideStr(&this.SshCredentials.KeyPath, other.SshCredentials.KeyPath)
-	overrideStr(&this.SshCredentials.KeyPassword, other.SshCredentials.KeyPassword)
-	overrideBool(&this.SshCredentials.IgnoreHostKey, other.SshCredentials.IgnoreHostKey)
+func (c *Credentials) merge(other *Credentials) {
+	overrideStr(&c.HttpToken, other.HttpToken)
+	overrideStr(&c.HttpCredentials.Username, other.HttpCredentials.Username)
+	overrideStr(&c.HttpCredentials.Password, other.HttpCredentials.Password)
+	overrideBool(&c.SshCredentials.UseAgent, other.SshCredentials.UseAgent)
+	overrideStr(&c.SshCredentials.Username, other.SshCredentials.Username)
+	overrideStr(&c.SshCredentials.KeyPath, other.SshCredentials.KeyPath)
+	overrideStr(&c.SshCredentials.KeyPassword, other.SshCredentials.KeyPassword)
+	overrideBool(&c.SshCredentials.IgnoreHostKey, other.SshCredentials.IgnoreHostKey)
 }
 
 /////////////////////////////////////////////////
 // Environment variable substitution
 /////////////////////////////////////////////////
 
-func (this *ConfigSingle) resolveEnvVars(envVars map[string]string) {
+func (cs *ConfigSingle) resolveEnvVars(envVars map[string]string) {
 	var err error
-	this.Path, err = envsubst.Replace(this.Path, envVars)
+	cs.Path, err = envsubst.Replace(cs.Path, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, "", "localPath")
 	}
 
-	for k, target := range this.Targets {
+	for k, target := range cs.Targets {
 		target.resolveEnvVars(k, envVars)
-		this.Targets[k] = target
+		cs.Targets[k] = target
 	}
 }
 
-func (this *Config) resolveEnvVars(envVars map[string]string) {
-	for k, repo := range this.Repositories {
+func (cfg *Config) resolveEnvVars(envVars map[string]string) {
+	for k, repo := range cfg.Repositories {
 		repo.resolveEnvVars(k, envVars)
-		this.Repositories[k] = repo
+		cfg.Repositories[k] = repo
 	}
 }
 
-func (this *Repository) resolveEnvVars(parent string, envVars map[string]string) {
+func (r *Repository) resolveEnvVars(parent string, envVars map[string]string) {
 	var err error
-	this.URL, err = envsubst.Replace(this.URL, envVars)
+	r.URL, err = envsubst.Replace(r.URL, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "url")
 	}
-	this.LocalPath, err = envsubst.Replace(this.LocalPath, envVars)
+	r.LocalPath, err = envsubst.Replace(r.LocalPath, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "localPath")
 	}
-	this.HttpToken, err = envsubst.Replace(this.HttpToken, envVars)
+	r.HttpToken, err = envsubst.Replace(r.HttpToken, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "httpToken")
 	}
-	this.HttpCredentials.resolveEnvVars(parent, envVars)
-	this.SshCredentials.resolveEnvVars(parent, envVars)
+	r.HttpCredentials.resolveEnvVars(parent, envVars)
+	r.SshCredentials.resolveEnvVars(parent, envVars)
 }
 
-func (this *HttpCredentials) resolveEnvVars(parent string, envVars map[string]string) {
+func (h *HttpCredentials) resolveEnvVars(parent string, envVars map[string]string) {
 	var err error
-	this.Username, err = envsubst.Replace(this.Username, envVars)
+	h.Username, err = envsubst.Replace(h.Username, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "username")
 	}
-	this.Password, err = envsubst.Replace(this.Password, envVars)
+	h.Password, err = envsubst.Replace(h.Password, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "password")
 	}
 }
 
-func (this *SshCredentials) resolveEnvVars(parent string, envVars map[string]string) {
+func (s *SshCredentials) resolveEnvVars(parent string, envVars map[string]string) {
 	var err error
-	this.Username, err = envsubst.Replace(this.Username, envVars)
+	s.Username, err = envsubst.Replace(s.Username, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "username")
 	}
-	this.KeyPassword, err = envsubst.Replace(this.KeyPassword, envVars)
+	s.KeyPassword, err = envsubst.Replace(s.KeyPassword, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "keyPassword")
 	}
-	this.KeyPath, err = envsubst.Replace(this.KeyPath, envVars)
+	s.KeyPath, err = envsubst.Replace(s.KeyPath, envVars)
 	if err != nil {
 		logEnvVarSubstWarning(err, parent, "keyPath")
 	}
@@ -319,150 +319,150 @@ func logEnvVarSubstWarning(err error, field ...string) {
 // Validation
 /////////////////////////////////////////////////
 
-func (this *ConfigSingle) validate(v *validation.V) {
+func (cs *ConfigSingle) validate(v *validation.V) {
 	v.FailWhen(
-		len(this.Targets) == 0,
+		len(cs.Targets) == 0,
 		"targets",
 		"at least one target must be specified",
 	)
 
 	reposV := v.Sub("targets")
-	for targetId, target := range this.Targets {
+	for targetId, target := range cs.Targets {
 		targetV := reposV.Sub(targetId)
 		target.validate(targetV)
 	}
 }
 
-func (this *Target) validate(v *validation.V) {
-	this.Repository.validate(v)
-	this.SyncSpec.validate(v)
+func (t *Target) validate(v *validation.V) {
+	t.Repository.validate(v)
+	t.SyncSpec.validate(v)
 }
 
-func (this *SyncSpec) validate(v *validation.V) {
+func (ss *SyncSpec) validate(v *validation.V) {
 	v.FailWhen(
-		this.Interval.Nanoseconds() < 0,
+		ss.Interval.Nanoseconds() < 0,
 		"interval",
 		"must not be negative",
 	)
 	v.FailWhen(
-		len(this.Branches) == 0 && len(this.Tags) == 0,
+		len(ss.Branches) == 0 && len(ss.Tags) == 0,
 		"branches/tags",
 		"at least one branch or tag spec must be specified",
 	)
 
 	branchV := v.Sub("branches")
-	for i, branch := range this.Branches {
+	for i, branch := range ss.Branches {
 		branchV.IndexFailFWhen(branch.IsEmpty(), i, "matcher must not be empty")
 	}
 
 	tagV := v.Sub("tags")
-	for i, tag := range this.Tags {
+	for i, tag := range ss.Tags {
 		tagV.IndexFailFWhen(tag.IsEmpty(), i, "matcher must not be empty")
 	}
 }
 
-func (this *Config) validate(v *validation.V) {
+func (cfg *Config) validate(v *validation.V) {
 	v.FailWhen(
-		len(this.Repositories) == 0,
+		len(cfg.Repositories) == 0,
 		"repositories",
 		"at least one repository must be specified",
 	)
 	v.FailWhen(
-		len(this.Mappings) == 0,
+		len(cfg.Mappings) == 0,
 		"mappings",
 		"at least one mapping must be specified",
 	)
 
 	reposV := v.Sub("repositories")
-	for repoId, repo := range this.Repositories {
+	for repoId, repo := range cfg.Repositories {
 		repoV := reposV.Sub(repoId)
 		repo.validate(repoV)
 	}
 
 	mappingsV := v.Sub("mappings")
-	for i, mapping := range this.Mappings {
+	for i, mapping := range cfg.Mappings {
 		mappingV := mappingsV.IndexedSub(i)
 		mapping.validate(mappingV)
 
-		if _, ok := this.Repositories[mapping.Source]; !ok {
+		if _, ok := cfg.Repositories[mapping.Source]; !ok {
 			mappingV.FailF("source", "source %s is not specified", mapping.Source)
 		}
 
 		targetsV := mappingV.Sub("targets")
 		for i, target := range mapping.Targets {
-			if _, ok := this.Repositories[target]; !ok {
+			if _, ok := cfg.Repositories[target]; !ok {
 				targetsV.IndexFailF(i, "target %s is not specified", target)
 			}
 		}
 	}
 }
 
-func (this *SyncMapping) validate(v *validation.V) {
+func (sm *SyncMapping) validate(v *validation.V) {
 	v.FailWhen(
-		this.Source == "",
+		sm.Source == "",
 		"source",
 		"source cannot be an empty string",
 	)
 	v.FailWhen(
-		len(this.Targets) == 0,
+		len(sm.Targets) == 0,
 		"targets",
 		"at least one target must be defined",
 	)
 
 	targetsV := v.Sub("targets")
-	for i, target := range this.Targets {
+	for i, target := range sm.Targets {
 		if target == "" {
 			targetsV.IndexFail(i, "target cannot be an empty string")
 		}
 	}
-	this.SyncSpec.validate(v)
+	sm.SyncSpec.validate(v)
 }
 
-func (this *Repository) validate(v *validation.V) {
+func (r *Repository) validate(v *validation.V) {
 	v.FailFWhen(
-		this.URL == "" && this.LocalPath == "",
+		r.URL == "" && r.LocalPath == "",
 		"url",
 		"both repository URL and local path cannot be empty",
 	)
 
 	var authV *validation.V
-	switch this.TargetAuthMethod {
+	switch r.TargetAuthMethod {
 	case AuthMethodUndefined, AuthMethodNone:
 		break
 	case AuthMethodHttpToken:
 		v.FailWhen(
-			this.HttpToken == "",
+			r.HttpToken == "",
 			"httpToken",
 			"expected HTTP token to be set",
 		)
 	case AuthMethodHttpCredentials:
 		authV = v.Sub("httpCredentials")
 		authV.FailWhen(
-			this.HttpCredentials.Username == "",
+			r.HttpCredentials.Username == "",
 			"username",
 			"expected HTTP username to be set",
 		)
 		authV.FailWhen(
-			this.HttpCredentials.Password == "",
+			r.HttpCredentials.Password == "",
 			"password",
 			"expected HTTP password to be set",
 		)
 	case AuthMethodSshAgent:
 		authV = v.Sub("sshCredentials")
 		authV.FailWhen(
-			!this.SshCredentials.UseAgent,
+			!r.SshCredentials.UseAgent,
 			"useAgent",
 			"expected SSH agent to be enabled",
 		)
 	case AuthMethodSshKey:
 		authV = v.Sub("sshCredentials")
 		authV.FailWhen(
-			this.SshCredentials.KeyPath == "",
+			r.SshCredentials.KeyPath == "",
 			"keyPath",
 			"expected SSH key path to be set",
 		)
 	default:
-		v.FailF("authMethod", "unexpected auth method %s", this.TargetAuthMethod)
+		v.FailF("authMethod", "unexpected auth method %s", r.TargetAuthMethod)
 	}
 }
 
@@ -470,7 +470,7 @@ func (this *Repository) validate(v *validation.V) {
 // Parsing
 /////////////////////////////////////////////////
 
-func (this *Config) Parse(
+func (cfg *Config) Parse(
 	envVars envvar.Vars,
 	config io.Reader,
 	credentials io.Reader,
@@ -490,7 +490,7 @@ func (this *Config) Parse(
 		if err := temp.ConfigSingle.parse(envVars, credentials); err != nil {
 			return err
 		}
-		this.fromSingle(&temp.ConfigSingle)
+		cfg.fromSingle(&temp.ConfigSingle)
 		return nil
 	}
 
@@ -498,11 +498,11 @@ func (this *Config) Parse(
 	if err := temp.Config.parse(envVars, credentials); err != nil {
 		return err
 	}
-	*this = temp.Config
+	*cfg = temp.Config
 	return nil
 }
 
-func (this *ConfigSingle) parse(
+func (cs *ConfigSingle) parse(
 	envVars envvar.Vars,
 	credentials io.Reader,
 ) error {
@@ -512,19 +512,19 @@ func (this *ConfigSingle) parse(
 	if err != nil {
 		return err
 	}
-	this.mergeCredentials(parsedCreds)
+	cs.mergeCredentials(parsedCreds)
 
 	// Resolve any environment variables used in strings
-	this.resolveEnvVars(envVars.ToMap())
+	cs.resolveEnvVars(envVars.ToMap())
 
 	// Validate the config
 	var v validation.V
 	v.Init()
-	this.validate(&v)
+	cs.validate(&v)
 	return v.ToError()
 }
 
-func (this *Config) parse(
+func (cfg *Config) parse(
 	envVars envvar.Vars,
 	credentials io.Reader,
 ) error {
@@ -534,15 +534,15 @@ func (this *Config) parse(
 	if err != nil {
 		return err
 	}
-	this.mergeCredentials(parsedCreds)
+	cfg.mergeCredentials(parsedCreds)
 
 	// Resolve any environment variables used in strings
-	this.resolveEnvVars(envVars.ToMap())
+	cfg.resolveEnvVars(envVars.ToMap())
 
 	// Validate the config
 	var v validation.V
 	v.Init()
-	this.validate(&v)
+	cfg.validate(&v)
 	return v.ToError()
 }
 
@@ -557,21 +557,21 @@ func parseCredentials(credentials io.Reader) (map[string]Credentials, error) {
 	return parsedCreds, nil
 }
 
-func (this *Config) fromSingle(cfg *ConfigSingle) {
+func (cfg *Config) fromSingle(cs *ConfigSingle) {
 	sourceKey := "source"
-	this.Repositories = make(map[string]Repository, len(cfg.Targets)+1)
-	this.Repositories[sourceKey] = Repository{
+	cfg.Repositories = make(map[string]Repository, len(cs.Targets)+1)
+	cfg.Repositories[sourceKey] = Repository{
 		Credentials: Credentials{
 			TargetAuthMethod: AuthMethodNone,
 		},
-		LocalPath: cfg.Path,
+		LocalPath: cs.Path,
 		URL:       "",
 		InMemory:  false,
 	}
 
-	for targetId, target := range cfg.Targets {
-		this.Repositories[targetId] = target.Repository
-		this.Mappings = append(this.Mappings, SyncMapping{
+	for targetId, target := range cs.Targets {
+		cfg.Repositories[targetId] = target.Repository
+		cfg.Mappings = append(cfg.Mappings, SyncMapping{
 			Source:   sourceKey,
 			Targets:  []string{targetId},
 			SyncSpec: target.SyncSpec,

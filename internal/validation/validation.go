@@ -26,12 +26,12 @@ type fault struct {
 	description string
 }
 
-func (this *V) Init() {
-	this.id = 0
-	this.subs = nil
-	this.faults = nil
-	this.depth = 0
-	this.stats = &stats{
+func (v *V) Init() {
+	v.id = 0
+	v.subs = nil
+	v.faults = nil
+	v.depth = 0
+	v.stats = &stats{
 		charCount:  0,
 		faultCount: 0,
 		subCount:   1,
@@ -42,62 +42,62 @@ func (this *V) Init() {
 // Adding faults
 ///////////////////////////////////
 
-func (this *V) Fail(name, description string) {
-	if this.faults == nil {
-		this.faults = make([]fault, 0, 10)
+func (v *V) Fail(name, description string) {
+	if v.faults == nil {
+		v.faults = make([]fault, 0, 10)
 	}
-	this.faults = append(this.faults, fault{
+	v.faults = append(v.faults, fault{
 		name:        name,
 		description: description,
 	})
-	this.stats.faultCount += 1
-	this.stats.charCount += len(name) + len(description) + 2 + 2*this.depth
+	v.stats.faultCount += 1
+	v.stats.charCount += len(name) + len(description) + 2 + 2*v.depth
 }
 
-func (this *V) IndexFailF(index int, descriptionFormat string, a ...any) {
-	this.FailF(strconv.Itoa(index), descriptionFormat, a...)
+func (v *V) IndexFailF(index int, descriptionFormat string, a ...any) {
+	v.FailF(strconv.Itoa(index), descriptionFormat, a...)
 }
 
-func (this *V) FailF(name, descriptionFormat string, a ...any) {
+func (v *V) FailF(name, descriptionFormat string, a ...any) {
 	description := fmt.Sprintf(descriptionFormat, a...)
-	this.Fail(name, description)
+	v.Fail(name, description)
 }
 
-func (this *V) IndexFail(index int, description string) {
-	this.Fail(strconv.Itoa(index), description)
+func (v *V) IndexFail(index int, description string) {
+	v.Fail(strconv.Itoa(index), description)
 }
 
-func (this *V) IndexFailFWhen(
+func (v *V) IndexFailFWhen(
 	condition bool,
 	index int,
 	descriptionFormat string,
 	a ...any,
 ) {
 	if condition {
-		this.FailF(strconv.Itoa(index), descriptionFormat, a...)
+		v.FailF(strconv.Itoa(index), descriptionFormat, a...)
 	}
 }
 
-func (this *V) FailFWhen(
+func (v *V) FailFWhen(
 	condition bool,
 	name,
 	descriptionFormat string,
 	a ...any,
 ) {
 	if condition {
-		this.FailF(name, descriptionFormat, a...)
+		v.FailF(name, descriptionFormat, a...)
 	}
 }
 
-func (this *V) IndexFailWhen(condition bool, index int, description string) {
+func (v *V) IndexFailWhen(condition bool, index int, description string) {
 	if condition {
-		this.Fail(strconv.Itoa(index), description)
+		v.Fail(strconv.Itoa(index), description)
 	}
 }
 
-func (this *V) FailWhen(condition bool, name, description string) {
+func (v *V) FailWhen(condition bool, name, description string) {
 	if condition {
-		this.Fail(name, description)
+		v.Fail(name, description)
 	}
 }
 
@@ -105,59 +105,59 @@ func (this *V) FailWhen(condition bool, name, description string) {
 // Sub validator
 ///////////////////////////////////
 
-func (this *V) Sub(name string) (child *V) {
-	if this.subs == nil {
-		this.subs = make([]*V, 0, 10)
+func (v *V) Sub(name string) (child *V) {
+	if v.subs == nil {
+		v.subs = make([]*V, 0, 10)
 	}
 
-	for i := range this.subs {
-		if this.subs[i].name == name {
-			return this.subs[i]
+	for i := range v.subs {
+		if v.subs[i].name == name {
+			return v.subs[i]
 		}
 	}
 
 	child = &V{
 		name:  name,
-		id:    this.stats.subCount,
-		stats: this.stats,
-		depth: this.depth + 1,
+		id:    v.stats.subCount,
+		stats: v.stats,
+		depth: v.depth + 1,
 	}
-	this.subs = append(this.subs, child)
-	this.stats.subCount += 1
+	v.subs = append(v.subs, child)
+	v.stats.subCount += 1
 	return
 }
 
-func (this *V) IndexedSub(index int) *V {
-	return this.Sub(strconv.Itoa(index))
+func (v *V) IndexedSub(index int) *V {
+	return v.Sub(strconv.Itoa(index))
 }
 
 ///////////////////////////////////
 // Report
 ///////////////////////////////////
 
-func (this *V) Count() int {
-	return this.stats.faultCount
+func (v *V) Count() int {
+	return v.stats.faultCount
 }
-func (this *V) Report() string {
-	if this.Count() == 0 {
+func (v *V) Report() string {
+	if v.Count() == 0 {
 		return ""
 	}
 
 	var b strings.Builder
 	b.Grow(2 * 1024)
 
-	subFaultCount := make([]int, this.stats.subCount)
+	subFaultCount := make([]int, v.stats.subCount)
 	var stack Stack
 	{
-		stack.Init(this.stats.subCount)
+		stack.Init(v.stats.subCount)
 		stackData := make([]struct {
 			visited bool
 			parent  *V
 			v       *V
-		}, this.stats.subCount)
+		}, v.stats.subCount)
 
 		stack.Push(0)
-		stackData[0].v = this
+		stackData[0].v = v
 
 		for {
 			id, hasNext := stack.Pop()
@@ -165,21 +165,21 @@ func (this *V) Report() string {
 				break
 			}
 			parent := stackData[id].parent
-			v := stackData[id].v
+			sv := stackData[id].v
 
 			if stackData[id].visited {
-				subFaultCount[id] += len(v.faults)
+				subFaultCount[id] += len(sv.faults)
 				if parent != nil {
-					subFaultCount[parent.id] += subFaultCount[v.id]
+					subFaultCount[parent.id] += subFaultCount[sv.id]
 				}
 			} else {
 				stackData[id].visited = true
 				stack.Push(id)
-				for i := range v.subs {
-					sub := v.subs[i]
+				for i := range sv.subs {
+					sub := sv.subs[i]
 					if !stackData[sub.id].visited {
-						stackData[sub.id].parent = v
-						stackData[sub.id].v = v.subs[i]
+						stackData[sub.id].parent = sv
+						stackData[sub.id].v = sv.subs[i]
 						stack.Push(sub.id)
 					}
 				}
@@ -188,13 +188,13 @@ func (this *V) Report() string {
 	}
 
 	{
-		stack.Init(this.stats.subCount)
+		stack.Init(v.stats.subCount)
 		stackData := make([]struct {
 			v *V
-		}, this.stats.subCount)
+		}, v.stats.subCount)
 
 		stack.Push(0)
-		stackData[0].v = this
+		stackData[0].v = v
 
 		for {
 			id, hasNext := stack.Pop()
@@ -207,25 +207,25 @@ func (this *V) Report() string {
 				continue
 			}
 
-			v := stackData[id].v
+			sv := stackData[id].v
 
-			if v.depth > 0 {
-				indent(&b, v.depth-1)
-				_, _ = b.WriteString(v.name)
+			if sv.depth > 0 {
+				indent(&b, sv.depth-1)
+				_, _ = b.WriteString(sv.name)
 				_, _ = b.WriteString(":\n")
 			}
 
-			for _, fault := range v.faults {
-				indent(&b, v.depth)
+			for _, fault := range sv.faults {
+				indent(&b, sv.depth)
 				_, _ = b.WriteString(fault.name)
 				_, _ = b.WriteString(": ")
 				_, _ = b.WriteString(fault.description)
 				_ = b.WriteByte('\n')
 			}
 
-			for i := range v.subs {
-				index := len(v.subs) - 1 - i
-				sub := v.subs[index]
+			for i := range sv.subs {
+				index := len(sv.subs) - 1 - i
+				sub := sv.subs[index]
 				stack.Push(sub.id)
 				stackData[sub.id].v = sub
 			}
@@ -245,12 +245,12 @@ func indent(b *strings.Builder, n int) {
 // Errors
 ///////////////////////////////////
 
-func (this *V) ToError() error {
-	if this.Count() <= 0 {
+func (v *V) ToError() error {
+	if v.Count() <= 0 {
 		return nil
 	}
 	return &ValidationError{
-		report: this.Report(),
+		report: v.Report(),
 	}
 }
 
@@ -258,6 +258,6 @@ type ValidationError struct {
 	report string
 }
 
-func (this *ValidationError) Error() string {
-	return fmt.Sprintf("validation failed:\n%s", this.report)
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("validation failed:\n%s", e.report)
 }

@@ -17,7 +17,7 @@ type M struct {
 	spec    string
 }
 
-type m struct {
+type mSpec struct {
 	Spec     string `json:"spec"`
 	UseRegex bool   `json:"useRegex"`
 }
@@ -38,21 +38,21 @@ func FromStringOrPanic(s string) (matcher M) {
 	return
 }
 
-func (this *M) Clear() {
-	this.pattern = nil
-	this.spec = ""
+func (m *M) Clear() {
+	m.pattern = nil
+	m.spec = ""
 }
 
-func (this *M) MarshalJSON() ([]byte, error) {
-	return json.Marshal(this.String())
+func (m *M) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.String())
 }
 
-func (this *M) UnmarshalJSON(b []byte) error {
+func (m *M) UnmarshalJSON(b []byte) error {
 	{
 		var v string
 		err := json.Unmarshal(b, &v)
 		if err == nil {
-			return this.FromString(v)
+			return m.FromString(v)
 		}
 		switch err.(type) {
 		case *json.UnmarshalTypeError:
@@ -61,52 +61,52 @@ func (this *M) UnmarshalJSON(b []byte) error {
 		}
 	}
 
-	var v m
+	var v mSpec
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
-	this.spec = v.Spec
+	m.spec = v.Spec
 	if v.UseRegex {
-		return this.FromPattern(v.Spec)
+		return m.FromPattern(v.Spec)
 	}
 	return nil
 }
 
-func (this *M) FromString(s string) error {
+func (m *M) FromString(s string) error {
 	if strings.HasPrefix(s, "/") && strings.HasSuffix(s, "/") {
-		this.spec = s[1 : len(s)-1]
-		return this.FromPattern(this.spec)
+		m.spec = s[1 : len(s)-1]
+		return m.FromPattern(m.spec)
 	}
-	this.spec = s
+	m.spec = s
 	return nil
 }
 
-func (this *M) FromPattern(s string) (err error) {
-	this.pattern, err = regexp.Compile(s)
+func (m *M) FromPattern(s string) (err error) {
+	m.pattern, err = regexp.Compile(s)
 	return
 }
 
-func (this *M) String() string {
-	if this.UsesRegex() {
-		return fmt.Sprintf("/%s/", this.spec)
+func (m *M) String() string {
+	if m.UsesRegex() {
+		return fmt.Sprintf("/%s/", m.spec)
 	}
-	return this.spec
+	return m.spec
 }
 
-func (this *M) IsEmpty() bool {
-	return this.pattern == nil && this.spec == ""
+func (m *M) IsEmpty() bool {
+	return m.pattern == nil && m.spec == ""
 }
 
-func (this *M) UsesRegex() bool {
-	return this.pattern != nil
+func (m *M) UsesRegex() bool {
+	return m.pattern != nil
 }
 
-func (this *M) MatchString(s string) bool {
-	if this.IsEmpty() {
+func (m *M) MatchString(s string) bool {
+	if m.IsEmpty() {
 		return true
 	}
-	if this.UsesRegex() {
-		return this.pattern.MatchString(s)
+	if m.UsesRegex() {
+		return m.pattern.MatchString(s)
 	}
-	return this.spec == s
+	return m.spec == s
 }
