@@ -2,3 +2,4 @@
 go = "1.26.2"
 "go:github.com/go-delve/delve/cmd/dlv" = "1.26.1"
 "go:golang.org/x/tools/gopls" = "0.21.0"
+"golangci-lint" = "v2.11.4"

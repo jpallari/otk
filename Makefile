@@ -31,3 +31,15 @@ test-integration-podman:
 	DOCKER_HOST="unix://$$(podman info --format '{{.Host.RemoteSocket.Path}}')" \
 	TESTCONTAINERS_RYUK_DISABLED=true \
 	mise exec -- go test -race -v ./...
+
+.PHONY: lint
+lint:
+	mise exec -- golangci-lint run
+
+.PHONY: lint-fix
+lint-fix:
+	mise exec -- golangci-lint run --fix
+
+.PHONY: format
+format:
+	mise exec -- golangci-lint fmt
